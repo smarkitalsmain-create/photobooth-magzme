@@ -1,0 +1,29 @@
+{
+  "name": "photobooth-server",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Photobooth backend server with admin panel",
+  "main": "index.js",
+  "scripts": {
+    "dev": "node --watch index.js",
+    "start": "node index.js",
+    "postinstall": "node scripts/ensure-env.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "db:validate": "prisma validate",
+    "db:migrate": "prisma migrate dev"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.19.0",
+    "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1",
+    "helmet": "^7.1.0",
+    "cors": "^2.8.5",
+    "express-rate-limit": "^7.1.5",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "prisma": "^5.19.0"
+  }
+}
