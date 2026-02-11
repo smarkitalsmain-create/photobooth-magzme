@@ -1,6 +1,12 @@
 /**
  * Photobooth Server
  * Express server with Prisma, multer, and admin panel
+ * 
+ * DEPLOYMENT NOTES:
+ * - This backend must be deployed separately from the Vite frontend
+ * - /admin and /api routes are served ONLY by this Express server
+ * - Frontend static hosting alone will NOT support admin routes
+ * - Ensure reverse proxy (nginx, Cloudflare, etc.) routes /admin, /api, and /uploads to this server
  */
 
 import express from "express";
@@ -22,25 +28,26 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Validate required environment variables
-// Server must fail loudly if DATABASE_URL is missing
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL is required but not set in environment variables. Please configure it in server/.env");
-}
-
-const requiredEnvVars = ["ADMIN_USER", "ADMIN_PASS"];
+// Production readiness check - validate required environment variables
+// Server must fail loudly if required vars are missing
+const requiredEnvVars = ["DATABASE_URL", "ADMIN_USER", "ADMIN_PASS"];
 const missingEnvVars = requiredEnvVars.filter((key) => !process.env[key]);
 
 if (missingEnvVars.length > 0) {
   console.error("ERROR: Missing required environment variables:");
   missingEnvVars.forEach((key) => console.error(`  - ${key}`));
-  console.error("\nPlease set these in your .env file. See .env.example for reference.");
+  console.error("\nPlease set these in your environment. See .env.example for reference.");
+  console.error("Server will not start without these variables.");
   process.exit(1);
 }
 
 const app = express();
 const prisma = new PrismaClient();
 const PORT = process.env.PORT || 5050;
+
+// Trust proxy for reverse proxy deployments (nginx, Cloudflare, etc.)
+// This allows Express to correctly identify client IPs and handle X-Forwarded-* headers
+app.set("trust proxy", true);
 
 // Ensure uploads directory exists
 const uploadsDir = path.join(__dirname, "uploads");
@@ -60,10 +67,13 @@ app.use(helmet({
   },
 }));
 
-// CORS for API endpoints (admin pages are same-origin)
+// CORS for API endpoints
+// In production, set CORS_ORIGIN to your frontend domain (e.g., https://photobooth.magzme.com)
+// Admin pages are same-origin and don't require CORS
+const corsOrigin = process.env.CORS_ORIGIN || (process.env.NODE_ENV === "production" ? undefined : "*");
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || "*",
+    origin: corsOrigin,
     credentials: true,
   })
 );
@@ -253,10 +263,17 @@ app.use((err, req, res, next) => {
 });
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Photobooth server running on http://localhost:${PORT}`);
-  console.log(`📸 Admin panel: http://localhost:${PORT}/admin`);
+// Server listens on process.env.PORT (required by most hosting platforms)
+// Defaults to 5050 for local development
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 Photobooth server running on port ${PORT}`);
+  console.log(`📸 Admin panel: /admin`);
   console.log(`📁 Uploads directory: ${uploadsDir}`);
+  console.log(`✅ Production readiness check passed`);
+  console.log(`🔒 Admin routes protected with Basic Auth`);
+  if (process.env.NODE_ENV === "production") {
+    console.log(`🌐 Production mode: Ensure reverse proxy routes /admin, /api, and /uploads to this server`);
+  }
 });
 
 // Graceful shutdown

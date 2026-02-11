@@ -1,5 +1,10 @@
 {
   "rewrites": [
+    { "source": "/admin", "destination": "/api/admin" },
+    { "source": "/admin/photos", "destination": "/api/admin/photos" },
+    { "source": "/admin/photos/:id/download", "destination": "/api/admin/photos/:id/download" },
+    { "source": "/admin/photos/:id/delete", "destination": "/api/admin/photos/:id/delete" },
+    { "source": "/admin/styles.css", "destination": "/api/admin/styles.css" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
