@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@prisma/client": "^5.19.0",
-    "@vercel/blob": "^3.0.0",
+    "@vercel/blob": "^2.2.0",
     "busboy": "^1.6.0",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "^1.2.11",
