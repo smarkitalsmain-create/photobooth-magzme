@@ -8,7 +8,7 @@ import fs from "fs/promises";
 import fsSync from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { renderPhotosList, renderPhotoDetail } from "./render.js";
+import { renderDashboard, renderPhotosList, renderPhotoDetail } from "./render.js";
 import { basicAuth } from "./basicAuth.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -20,10 +20,11 @@ const prisma = new PrismaClient();
 router.use(basicAuth);
 
 /**
- * GET /admin - Redirect to photos list
+ * GET /admin - Admin dashboard
  */
 router.get("/", (req, res) => {
-  res.redirect("/admin/photos");
+  const html = renderDashboard();
+  res.send(html);
 });
 
 /**

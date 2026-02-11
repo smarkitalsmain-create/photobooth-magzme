@@ -27,6 +27,28 @@ export const renderLayout = (title, content) => {
 </html>`;
 };
 
+export const renderDashboard = () => {
+  const content = `
+    <div class="dashboard">
+      <div class="dashboard-content">
+        <h2>Admin Dashboard</h2>
+        <div class="dashboard-cards">
+          <a href="/admin/photos" class="dashboard-card">
+            <div class="dashboard-card-icon">📸</div>
+            <div class="dashboard-card-title">Photo Management</div>
+            <div class="dashboard-card-description">View, download, and delete captured photos</div>
+          </a>
+        </div>
+        <div class="dashboard-links">
+          <a href="/uploads" class="dashboard-link" target="_blank">Open Uploads</a>
+        </div>
+      </div>
+    </div>
+  `;
+
+  return renderLayout("Admin", content);
+};
+
 export const renderPhotosList = (photos, pagination, searchQuery) => {
   const { page, limit, total, totalPages } = pagination;
   
