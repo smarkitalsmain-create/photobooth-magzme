@@ -1,0 +1,167 @@
+@import url('https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@400;600;700;800&family=Permanent+Marker&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 40 30% 96%;
+    --foreground: 350 30% 15%;
+
+    --card: 40 25% 93%;
+    --card-foreground: 350 30% 15%;
+
+    --popover: 40 30% 96%;
+    --popover-foreground: 350 30% 15%;
+
+    --primary: 350 75% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 45 95% 65%;
+    --secondary-foreground: 350 30% 15%;
+
+    --muted: 40 20% 90%;
+    --muted-foreground: 350 15% 45%;
+
+    --accent: 160 50% 65%;
+    --accent-foreground: 350 30% 15%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 350 20% 85%;
+    --input: 350 20% 85%;
+    --ring: 350 75% 60%;
+
+    --radius: 1rem;
+
+    /* Custom MagzME tokens */
+    --coral: 15 85% 62%;
+    --mint: 160 50% 65%;
+    --retro-yellow: 45 95% 65%;
+    --retro-pink: 350 75% 60%;
+    --retro-purple: 280 55% 65%;
+    --cream: 40 30% 96%;
+    --booth-dark: 350 30% 12%;
+
+    --font-display: 'Lilita One', cursive;
+    --font-body: 'Nunito', sans-serif;
+    --font-marker: 'Permanent Marker', cursive;
+
+    --grain: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body);
+  }
+
+  h1, h2, h3 {
+    font-family: var(--font-display);
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+  }
+  .font-body {
+    font-family: var(--font-body);
+  }
+  .font-marker {
+    font-family: var(--font-marker);
+  }
+
+  .grain-overlay {
+    position: relative;
+  }
+  .grain-overlay::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: var(--grain);
+    pointer-events: none;
+    opacity: 0.5;
+    z-index: 1;
+  }
+
+  .retro-shadow {
+    box-shadow: 4px 4px 0px hsl(var(--booth-dark) / 0.15);
+  }
+
+  .retro-shadow-lg {
+    box-shadow: 6px 6px 0px hsl(var(--booth-dark) / 0.2);
+  }
+
+  .booth-border {
+    border: 3px solid hsl(var(--booth-dark) / 0.1);
+  }
+
+  .wiggle {
+    animation: wiggle 0.5s ease-in-out;
+  }
+
+  @keyframes wiggle {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(-3deg); }
+    75% { transform: rotate(3deg); }
+  }
+
+  @keyframes flash {
+    0% { opacity: 0; }
+    50% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  @keyframes slideDown {
+    0% { transform: translateY(-100%); opacity: 0; }
+    60% { transform: translateY(5%); opacity: 1; }
+    100% { transform: translateY(0); opacity: 1; }
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-10px) rotate(2deg); }
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: rotate(0deg); }
+    10% { transform: rotate(-5deg); }
+    20% { transform: rotate(5deg); }
+    30% { transform: rotate(-3deg); }
+    40% { transform: rotate(3deg); }
+    50% { transform: rotate(0deg); }
+  }
+
+  .animate-flash {
+    animation: flash 0.4s ease-out;
+  }
+
+  .animate-slide-down {
+    animation: slideDown 0.6s ease-out forwards;
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  .animate-shake {
+    animation: shake 0.6s ease-out;
+  }
+}
