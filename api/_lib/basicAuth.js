@@ -1,11 +1,13 @@
 /**
  * Basic Auth middleware for admin routes
  * Validates credentials from ADMIN_USER and ADMIN_PASS environment variables
+ * NEVER throws - always returns a result object
  */
 
 /**
  * Synchronous Basic Auth check (no async, no DB, no throws)
- * Returns { authorized: boolean, status?: number, message?: string }
+ * Returns { authorized: boolean, status?: number, message?: string, headers?: object }
+ * On failure, includes WWW-Authenticate header
  */
 export function checkBasicAuthSync(req) {
   try {
@@ -18,6 +20,7 @@ export function checkBasicAuthSync(req) {
         authorized: false,
         status: 500,
         message: "Server configuration error: ADMIN_USER or ADMIN_PASS not set",
+        headers: {},
       };
     }
 
@@ -42,6 +45,9 @@ export function checkBasicAuthSync(req) {
         authorized: false,
         status: 401,
         message: "Unauthorized",
+        headers: {
+          "WWW-Authenticate": 'Basic realm="Admin"',
+        },
       };
     }
 
@@ -53,6 +59,9 @@ export function checkBasicAuthSync(req) {
           authorized: false,
           status: 401,
           message: "Unauthorized",
+          headers: {
+            "WWW-Authenticate": 'Basic realm="Admin"',
+          },
         };
       }
       const credentials = Buffer.from(base64Credentials, "base64").toString("utf-8");
@@ -68,6 +77,9 @@ export function checkBasicAuthSync(req) {
         authorized: false,
         status: 401,
         message: "Unauthorized",
+        headers: {
+          "WWW-Authenticate": 'Basic realm="Admin"',
+        },
       };
     }
 
@@ -76,6 +88,9 @@ export function checkBasicAuthSync(req) {
       authorized: false,
       status: 401,
       message: "Unauthorized",
+      headers: {
+        "WWW-Authenticate": 'Basic realm="Admin"',
+      },
     };
   } catch (error) {
     // Never throw - always return error result
@@ -83,6 +98,7 @@ export function checkBasicAuthSync(req) {
       authorized: false,
       status: 500,
       message: "Authentication check failed",
+      headers: {},
     };
   }
 }
