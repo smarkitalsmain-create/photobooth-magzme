@@ -13,15 +13,13 @@ import { PrismaClient } from "@prisma/client";
 // This ensures a single Prisma instance across all function invocations
 const globalForPrisma = globalThis;
 
-// Create singleton Prisma Client
+// Create singleton Prisma Client using nullish coalescing
 // Vercel caches this across invocations, so we reuse the same instance
-export const prisma =
-  globalForPrisma.prisma ||
-  new PrismaClient({
-    log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
-  });
+export const prisma = globalForPrisma.prisma ?? new PrismaClient({
+  log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
+});
 
-// Always store in globalThis for serverless
+// Store in globalThis for serverless (only if not already set)
 if (!globalForPrisma.prisma) {
   globalForPrisma.prisma = prisma;
 }
