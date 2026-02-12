@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && prisma generate",
     "build:dev": "vite build --mode development",
+    "postinstall": "prisma generate",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
@@ -66,10 +67,10 @@
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.9",
-    "zod": "^3.25.76"
+    "zod": "^3.25.76",
+    "prisma": "^5.19.0"
   },
   "devDependencies": {
-    "prisma": "^5.19.0",
     "@eslint/js": "^9.32.0",
     "@tailwindcss/typography": "^0.5.16",
     "@testing-library/jest-dom": "^6.6.0",
