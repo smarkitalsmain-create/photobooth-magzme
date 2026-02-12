@@ -5,6 +5,11 @@
  * 
  * IMPORTANT: Prisma Client must be generated at build time via "postinstall": "prisma generate"
  * This file imports from @prisma/client which is generated from /prisma/schema.prisma
+ * 
+ * NEON + VERCEL REQUIREMENT:
+ * On Vercel we must use Neon pooled connection string (pooler host) for Prisma to avoid hangs.
+ * Example: postgresql://user:pass@ep-xxx-pooler.us-east-2.aws.neon.tech/dbname?sslmode=require
+ * Do NOT hardcode DATABASE_URL in code; only use process.env.DATABASE_URL
  */
 
 import { PrismaClient } from "@prisma/client";
@@ -15,6 +20,7 @@ const globalForPrisma = globalThis;
 
 // Create singleton Prisma Client using nullish coalescing
 // Vercel caches this across invocations, so we reuse the same instance
+// DATABASE_URL is read from process.env (must be Neon pooled connection string on Vercel)
 export const prisma = globalForPrisma.prisma ?? new PrismaClient({
   log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
 });

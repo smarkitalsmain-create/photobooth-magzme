@@ -7,7 +7,7 @@
 export const config = { runtime: "nodejs" };
 
 export default function handler(req) {
-  // Check ADMIN_USER and ADMIN_PASS exist
+  // Validate env vars ADMIN_USER and ADMIN_PASS exist
   const adminUser = process.env.ADMIN_USER;
   const adminPass = process.env.ADMIN_PASS;
 
@@ -25,7 +25,7 @@ export default function handler(req) {
     });
   }
 
-  // Parse Authorization header safely
+  // Implement Basic Auth inline
   let authHeader = null;
   try {
     if (req.headers) {
@@ -88,7 +88,7 @@ export default function handler(req) {
     });
   }
 
-  // Auth successful - return HTML immediately
+  // Auth successful - return HTML immediately (no async, no awaits, no DB)
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>

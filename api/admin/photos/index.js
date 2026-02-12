@@ -3,11 +3,22 @@
  * Photo management page with list (protected by Basic Auth)
  * Serverless-safe: uses only DB + blobUrl, no filesystem
  * Minimal: inline auth and HTML rendering
+ * Has hard 10s timeout to prevent hanging
  */
 
 export const config = { runtime: "nodejs" };
 
 import { prisma } from "../../_lib/prisma.js";
+
+// Timeout helper using Promise.race
+function withTimeout(promise, timeoutMs) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Timeout")), timeoutMs)
+    ),
+  ]);
+}
 
 // Inline Basic Auth check (no external dependencies)
 function checkAuth(req) {
@@ -167,7 +178,7 @@ export default async function handler(req) {
       });
     }
 
-    // Check env vars
+    // Check env vars first (must end response on failure)
     if (!process.env.ADMIN_USER || !process.env.ADMIN_PASS) {
       return new Response("Missing ADMIN_USER/ADMIN_PASS", {
         status: 500,
@@ -182,7 +193,7 @@ export default async function handler(req) {
       });
     }
 
-    // Check Basic Auth
+    // Check Basic Auth (must end response on failure)
     const authResult = checkAuth(req);
     if (!authResult.authorized) {
       return new Response(authResult.message || "Unauthorized", {
@@ -215,22 +226,34 @@ export default async function handler(req) {
       ? { originalName: { contains: searchQuery, mode: "insensitive" } }
       : {};
 
-    // Get photos (short query, no heavy loops)
+    // Get photos with 10s timeout (short query, no heavy loops)
     let photos = [];
     let total = 0;
 
     try {
-      [photos, total] = await Promise.all([
-        prisma.photo.findMany({
-          where,
-          orderBy: { createdAt: "desc" },
-          take: limit,
-          skip,
-        }),
-        prisma.photo.count({ where }),
-      ]);
+      [photos, total] = await withTimeout(
+        Promise.all([
+          prisma.photo.findMany({
+            where,
+            orderBy: { createdAt: "desc" },
+            take: limit,
+            skip,
+          }),
+          prisma.photo.count({ where }),
+        ]),
+        10000 // 10 second timeout
+      );
     } catch (dbError) {
       console.error("DB error:", dbError);
+      
+      // Check if it was a timeout
+      if (dbError.message === "Timeout") {
+        return new Response("DB timeout", {
+          status: 504,
+          headers: { "Content-Type": "text/plain" },
+        });
+      }
+      
       return new Response("DB error", {
         status: 500,
         headers: { "Content-Type": "text/plain" },
