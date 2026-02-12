@@ -1,5 +1,6 @@
 /**
  * Server-side HTML rendering helper for admin panel
+ * Serverless-safe: no filesystem access, uses only blobUrl
  */
 
 function escapeHtml(text) {
@@ -81,58 +82,73 @@ export function renderPhotosList(photos, pagination, searchQuery) {
     </div>
   `;
 
+  // Filter out photos without blobUrl and show count
+  const photosWithBlob = photos.filter((p) => p.blobUrl && typeof p.blobUrl === "string");
+  const photosWithoutBlob = photos.filter((p) => !p.blobUrl || typeof p.blobUrl !== "string");
+
   if (photos.length === 0) {
     content += `<div class="empty-state">No photos found.</div>`;
   } else {
-    content += `
-      <div class="table-container">
-        <table class="photos-table">
-          <thead>
-            <tr>
-              <th>Preview</th>
-              <th>Original Name</th>
-              <th>MIME Type</th>
-              <th>Size</th>
-              <th>Uploaded</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-    `;
+    if (photosWithoutBlob.length > 0) {
+      content += `<div class="warning" style="background: #fff3cd; padding: 1rem; margin-bottom: 1rem; border-radius: 4px; color: #856404;">
+        Note: ${photosWithoutBlob.length} photo(s) without blobUrl (skipped from display)
+      </div>`;
+    }
 
-    photos.forEach((photo) => {
-      const sizeKB = (photo.size / 1024).toFixed(2);
-      const uploadDate = new Date(photo.createdAt).toLocaleString();
-      const previewUrl = photo.blobUrl || (photo.storagePath ? `/uploads/${photo.storagePath}` : "");
-      const viewUrl = previewUrl;
-      const downloadUrl = `/admin/photos/${photo.id}/download`;
-      const deleteUrl = `/admin/photos/${photo.id}/delete`;
+    if (photosWithBlob.length === 0) {
+      content += `<div class="empty-state">No photos with valid blobUrl found.</div>`;
+    } else {
+      content += `
+        <div class="table-container">
+          <table class="photos-table">
+            <thead>
+              <tr>
+                <th>Preview</th>
+                <th>Original Name</th>
+                <th>MIME Type</th>
+                <th>Size</th>
+                <th>Uploaded</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+
+      photosWithBlob.forEach((photo) => {
+        const sizeKB = ((photo.size || 0) / 1024).toFixed(2);
+        const uploadDate = new Date(photo.createdAt).toLocaleString();
+        const previewUrl = photo.blobUrl; // Only use blobUrl, no filesystem paths
+        const viewUrl = previewUrl;
+        const downloadUrl = `/admin/photos/${photo.id}/download`;
+        const deleteUrl = `/admin/photos/${photo.id}/delete`;
+
+        content += `
+          <tr>
+            <td>
+              <img src="${escapeHtml(previewUrl)}" alt="Preview" class="photo-thumbnail" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';">
+              <span style="display:none; color: #999;">No preview</span>
+            </td>
+            <td class="filename">${escapeHtml(photo.originalName || "unnamed")}</td>
+            <td>${escapeHtml(photo.mimeType || "unknown")}</td>
+            <td>${sizeKB} KB</td>
+            <td>${escapeHtml(uploadDate)}</td>
+            <td class="actions">
+              <a href="${escapeHtml(viewUrl)}" target="_blank" class="btn btn-sm btn-view">View</a>
+              <a href="${escapeHtml(downloadUrl)}" class="btn btn-sm btn-download">Download</a>
+              <form method="POST" action="${escapeHtml(deleteUrl)}" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this photo?');">
+                <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+              </form>
+            </td>
+          </tr>
+        `;
+      });
 
       content += `
-        <tr>
-          <td>
-            ${previewUrl ? `<img src="${escapeHtml(previewUrl)}" alt="Preview" class="photo-thumbnail" loading="lazy">` : "<span>No preview</span>"}
-          </td>
-          <td class="filename">${escapeHtml(photo.originalName)}</td>
-          <td>${escapeHtml(photo.mimeType)}</td>
-          <td>${sizeKB} KB</td>
-          <td>${escapeHtml(uploadDate)}</td>
-          <td class="actions">
-            ${viewUrl ? `<a href="${escapeHtml(viewUrl)}" target="_blank" class="btn btn-sm btn-view">View</a>` : ""}
-            <a href="${escapeHtml(downloadUrl)}" class="btn btn-sm btn-download">Download</a>
-            <form method="POST" action="${escapeHtml(deleteUrl)}" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this photo?');">
-              <button type="submit" class="btn btn-sm btn-danger">Delete</button>
-            </form>
-          </td>
-        </tr>
+            </tbody>
+          </table>
+        </div>
       `;
-    });
-
-    content += `
-          </tbody>
-        </table>
-      </div>
-    `;
+    }
 
     // Pagination
     if (totalPages > 1) {

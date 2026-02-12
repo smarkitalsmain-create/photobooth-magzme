@@ -3,67 +3,137 @@
  * Validates credentials from ADMIN_USER and ADMIN_PASS environment variables
  */
 
-export function checkBasicAuth(req) {
-  // Check if credentials are configured
-  const adminUser = process.env.ADMIN_USER;
-  const adminPass = process.env.ADMIN_PASS;
+/**
+ * Synchronous Basic Auth check (no async, no DB, no throws)
+ * Returns { authorized: boolean, status?: number, message?: string }
+ */
+export function checkBasicAuthSync(req) {
+  try {
+    // Check if credentials are configured
+    const adminUser = process.env.ADMIN_USER;
+    const adminPass = process.env.ADMIN_PASS;
 
-  if (!adminUser || !adminPass) {
-    return {
-      authorized: false,
-      error: {
+    if (!adminUser || !adminPass) {
+      return {
+        authorized: false,
         status: 500,
-        message: "Server configuration error: Admin credentials not set",
-      },
-    };
-  }
+        message: "Server configuration error: ADMIN_USER or ADMIN_PASS not set",
+      };
+    }
 
-  // Get Authorization header (Vercel Request format)
-  const authHeader =
-    req.headers?.authorization ||
-    req.headers?.get?.("authorization") ||
-    (typeof req.headers?.get === "function" ? req.headers.get("authorization") : null);
+    // Get Authorization header (Vercel Request format)
+    let authHeader = null;
+    try {
+      if (req.headers) {
+        if (typeof req.headers.get === "function") {
+          authHeader = req.headers.get("authorization");
+        } else if (req.headers.authorization) {
+          authHeader = Array.isArray(req.headers.authorization)
+            ? req.headers.authorization[0]
+            : req.headers.authorization;
+        }
+      }
+    } catch (err) {
+      // Header access failed, continue with null
+    }
 
-  if (!authHeader || !authHeader.startsWith("Basic ")) {
+    if (!authHeader || typeof authHeader !== "string" || !authHeader.startsWith("Basic ")) {
+      return {
+        authorized: false,
+        status: 401,
+        message: "Unauthorized",
+      };
+    }
+
+    // Decode credentials safely
+    try {
+      const base64Credentials = authHeader.split(" ")[1];
+      if (!base64Credentials) {
+        return {
+          authorized: false,
+          status: 401,
+          message: "Unauthorized",
+        };
+      }
+      const credentials = Buffer.from(base64Credentials, "base64").toString("utf-8");
+      const [username, password] = credentials.split(":");
+
+      // Validate credentials
+      if (username === adminUser && password === adminPass) {
+        return { authorized: true };
+      }
+    } catch (err) {
+      // Decode failed
+      return {
+        authorized: false,
+        status: 401,
+        message: "Unauthorized",
+      };
+    }
+
+    // Invalid credentials
     return {
       authorized: false,
-      error: {
-        status: 401,
-        headers: {
-          "WWW-Authenticate": 'Basic realm="Admin Panel"',
-        },
-        message: "Authentication required",
-      },
+      status: 401,
+      message: "Unauthorized",
+    };
+  } catch (error) {
+    // Never throw - always return error result
+    return {
+      authorized: false,
+      status: 500,
+      message: "Authentication check failed",
     };
   }
+}
 
-  // Decode credentials
-  const base64Credentials = authHeader.split(" ")[1];
-  const credentials = Buffer.from(base64Credentials, "base64").toString("utf-8");
-  const [username, password] = credentials.split(":");
-
-  // Validate credentials
-  if (username === adminUser && password === adminPass) {
-    return { authorized: true };
-  }
-
-  // Invalid credentials
-  return {
-    authorized: false,
-    error: {
-      status: 401,
-      headers: {
-        "WWW-Authenticate": 'Basic realm="Admin Panel"',
-      },
-      message: "Invalid credentials",
-    },
-  };
+/**
+ * Async version for routes that need it (kept for backward compatibility)
+ */
+export function checkBasicAuth(req) {
+  return checkBasicAuthSync(req);
 }
 
 export function requireAuth(req) {
-  const auth = checkBasicAuth(req);
+  const auth = checkBasicAuthSync(req);
   if (!auth.authorized) {
-    return auth.error;
+    return auth;
+  }
+  return null;
+}
+
+/**
+ * Validate required environment variables
+ * Returns error object if missing, null if all present
+ */
+export function validateEnv() {
+  const missing = [];
+  if (!process.env.DATABASE_URL) missing.push("DATABASE_URL");
+  if (!process.env.ADMIN_USER) missing.push("ADMIN_USER");
+  if (!process.env.ADMIN_PASS) missing.push("ADMIN_PASS");
+
+  if (missing.length > 0) {
+    return {
+      status: 500,
+      message: `Missing required environment variables: ${missing.join(", ")}`,
+    };
+  }
+  return null;
+}
+
+/**
+ * Validate only admin credentials (no DB required)
+ */
+export function validateAdminEnv() {
+  const missing = [];
+  if (!process.env.ADMIN_USER) missing.push("ADMIN_USER");
+  if (!process.env.ADMIN_PASS) missing.push("ADMIN_PASS");
+
+  if (missing.length > 0) {
+    return {
+      status: 500,
+      message: `Missing required environment variables: ${missing.join(", ")}`,
+    };
   }
   return null;
 }

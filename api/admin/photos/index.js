@@ -1,33 +1,82 @@
 /**
  * GET /api/admin/photos
  * Photo management page with list (protected by Basic Auth)
+ * Serverless-safe: uses only DB + blobUrl, no filesystem
  */
 
-import { requireAuth } from "../../_lib/basicAuth.js";
+export const config = { runtime: "nodejs" };
+
+import { checkBasicAuthSync } from "../../_lib/basicAuth.js";
 import { prisma } from "../../_lib/prisma.js";
 import { renderPhotosList } from "../../_lib/render.js";
 
 export default async function handler(req) {
-  if (req.method !== "GET") {
-    return new Response("Method not allowed", { status: 405 });
-  }
-
-  // Check Basic Auth
-  const authError = requireAuth(req);
-  if (authError) {
-    return new Response(authError.message, {
-      status: authError.status,
-      headers: {
-        "Content-Type": "text/plain",
-        ...authError.headers,
-      },
-    });
-  }
-
   try {
-    const url = new URL(req.url);
-    const page = parseInt(url.searchParams.get("page") || "1");
-    const limit = Math.min(parseInt(url.searchParams.get("limit") || "50"), 100);
+    if (req.method !== "GET") {
+      return new Response("Method not allowed", {
+        status: 405,
+        headers: {
+          "Content-Type": "text/plain",
+          "X-Admin-Alive": "true",
+        },
+      });
+    }
+
+    // Hard check: ADMIN_USER and ADMIN_PASS required for auth
+    if (!process.env.ADMIN_USER || !process.env.ADMIN_PASS) {
+      const missing = [];
+      if (!process.env.ADMIN_USER) missing.push("ADMIN_USER");
+      if (!process.env.ADMIN_PASS) missing.push("ADMIN_PASS");
+      return new Response(`Missing required environment variables: ${missing.join(", ")}`, {
+        status: 500,
+        headers: {
+          "Content-Type": "text/plain",
+          "X-Admin-Alive": "true",
+        },
+      });
+    }
+
+    // Hard check: DATABASE_URL required for this route (uses Prisma)
+    if (!process.env.DATABASE_URL) {
+      return new Response("Missing DATABASE_URL", {
+        status: 500,
+        headers: {
+          "Content-Type": "text/plain",
+          "X-Admin-Alive": "true",
+        },
+      });
+    }
+
+    // Check Basic Auth (synchronous)
+    const authResult = checkBasicAuthSync(req);
+    if (!authResult.authorized) {
+      return new Response(authResult.message || "Unauthorized", {
+        status: authResult.status || 401,
+        headers: {
+          "Content-Type": "text/plain",
+          "WWW-Authenticate": 'Basic realm="Admin"',
+          "X-Admin-Alive": "true",
+        },
+      });
+    }
+
+    // Parse query parameters safely
+    let url;
+    try {
+      url = new URL(req.url);
+    } catch (err) {
+      console.error("Invalid URL:", err);
+      return new Response("Invalid request URL", {
+        status: 400,
+        headers: {
+          "Content-Type": "text/plain",
+          "X-Admin-Alive": "true",
+        },
+      });
+    }
+
+    const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10) || 1);
+    const limit = Math.min(Math.max(1, parseInt(url.searchParams.get("limit") || "50", 10) || 50), 200);
     const searchQuery = url.searchParams.get("q")?.trim() || null;
     const skip = (page - 1) * limit;
 
@@ -41,23 +90,48 @@ export default async function handler(req) {
         }
       : {};
 
-    // Get total count and photos
-    const [total, photos] = await Promise.all([
-      prisma.photo.count({ where }),
-      prisma.photo.findMany({
+    // Get photos from database (handle empty DB gracefully)
+    let photos = [];
+
+    try {
+      photos = await prisma.photo.findMany({
         where,
         orderBy: { createdAt: "desc" },
-        skip,
         take: limit,
-      }),
-    ]);
+        skip,
+      });
+    } catch (dbError) {
+      console.error("DB error:", dbError);
+      return new Response("DB error", {
+        status: 500,
+        headers: {
+          "Content-Type": "text/plain",
+          "X-Admin-Alive": "true",
+        },
+      });
+    }
 
-    const totalPages = Math.ceil(total / limit);
+    // Ensure photos is always an array
+    if (!Array.isArray(photos)) {
+      photos = [];
+    }
+
+    // Get total count for pagination
+    let total = 0;
+    try {
+      total = await prisma.photo.count({ where });
+    } catch (dbError) {
+      console.error("DB count error:", dbError);
+      // Continue with total = 0 if count fails
+      total = 0;
+    }
+
+    const totalPages = Math.max(1, Math.ceil(total / limit));
 
     const pagination = {
       page,
       limit,
-      total,
+      total: total || 0,
       totalPages,
     };
 
@@ -66,10 +140,17 @@ export default async function handler(req) {
       status: 200,
       headers: {
         "Content-Type": "text/html",
+        "X-Admin-Alive": "true",
       },
     });
   } catch (error) {
-    console.error("Error fetching photos:", error);
-    return new Response("Error loading photos", { status: 500 });
+    console.error("Error in admin photos handler:", error);
+    return new Response("Admin function failed", {
+      status: 500,
+      headers: {
+        "Content-Type": "text/plain",
+        "X-Admin-Alive": "true",
+      },
+    });
   }
 }
