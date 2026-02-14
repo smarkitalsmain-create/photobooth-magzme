@@ -1,9 +1,20 @@
 {
   "rewrites": [
-    { "source": "/admin", "destination": "/api/admin" },
-    { "source": "/admin/photos", "destination": "/api/admin/photos" },
-    { "source": "/admin/photos/:id/:action", "destination": "/api/admin/photos/:id/:action" },
-    { "source": "/api/:path*", "destination": "/api/:path*" },
-    { "source": "/:path((?!api/|admin).*)", "destination": "/index.html" }
+    {
+      "source": "/api/:path*",
+      "destination": "/api/:path*"
+    },
+    {
+      "source": "/admin",
+      "destination": "/api/admin"
+    },
+    {
+      "source": "/admin/:path*",
+      "destination": "/api/admin"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
   ]
 }
