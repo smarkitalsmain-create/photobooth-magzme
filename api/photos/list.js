@@ -25,24 +25,26 @@ export default async function handler(req, res) {
       5000
     );
 
-    // Return all photos with hasUrl flag
+    // Return all photos with hasUrl and status flags
     const items = photos.map((photo) => {
       const url = photo.blobUrl ?? null;
+      const hasUrl = Boolean(url && url.trim().length > 0);
       return {
         id: photo.id,
         blobUrl: url,
         size: photo.size ?? 0,
         createdAt: photo.createdAt,
-        hasUrl: !!url,
+        hasUrl: hasUrl,
+        status: hasUrl ? "ready" : "legacy_missing_url",
       };
     });
 
-    res.status(200).end(JSON.stringify({ photos: items }));
+    res.status(200).end(JSON.stringify({ items }));
   } catch (err) {
     const isTimeout = String(err?.message || "").includes("TIMEOUT");
     // On timeout, return empty list instead of error (fail-safe)
     if (isTimeout) {
-      res.status(200).end(JSON.stringify({ photos: [] }));
+      res.status(200).end(JSON.stringify({ items: [] }));
       return;
     }
     // On other errors, return error JSON

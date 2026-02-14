@@ -49,9 +49,7 @@ export default async function handler(req, res) {
 
     res.status(200).end(
       JSON.stringify({
-        success: true,
-        deleted: result.count,
-        message: `Deleted ${result.count} legacy photo(s) with missing blobUrl`,
+        deletedCount: result.count,
       })
     );
   } catch (err) {

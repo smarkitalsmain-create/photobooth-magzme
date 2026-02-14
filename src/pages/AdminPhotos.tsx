@@ -113,32 +113,28 @@ const AdminPhotos = () => {
         return;
       }
       
-      // Expect { photos: [...] } format (or { items: [...] } for backward compatibility)
+      // Expect { items: [...] } format
       if (!data || typeof data !== "object") {
         setError("Invalid response format: expected object");
         setLoading(false);
         return;
       }
       
-      // Support both formats: { photos: [...] } and { items: [...] }
-      const photosArray = Array.isArray(data.photos) ? data.photos : 
-                         Array.isArray(data.items) ? data.items : null;
-      
-      if (!photosArray) {
-        setError("Invalid response format: expected 'photos' or 'items' array");
+      if (!Array.isArray(data.items)) {
+        setError("Invalid response format: expected 'items' array");
         setLoading(false);
         return;
       }
       
       // Handle empty array gracefully
-      if (photosArray.length === 0) {
+      if (data.items.length === 0) {
         setPhotos([]);
         setLoading(false);
         return;
       }
       
-      // Map photos format (API returns: id, blobUrl, size, createdAt, hasUrl)
-      const mappedPhotos = photosArray.map((item: any) => ({
+      // Map photos format (API returns: id, blobUrl, size, createdAt, hasUrl, status)
+      const mappedPhotos = data.items.map((item: any) => ({
         id: item.id,
         originalName: item.originalName || `Photo ${item.id.slice(0, 8)}`,
         mimeType: "image/png", // Default since not in response
@@ -147,6 +143,7 @@ const AdminPhotos = () => {
         blobUrl: item.blobUrl ?? null,
         url: item.blobUrl ?? null, // Keep for backward compatibility
         hasUrl: item.hasUrl ?? Boolean(item.blobUrl && item.blobUrl.trim() !== ""),
+        status: item.status || (item.hasUrl ? "ready" : "legacy_missing_url"),
       }));
       
       setPhotos(mappedPhotos);
@@ -233,7 +230,7 @@ const AdminPhotos = () => {
       }
 
       const result = await response.json();
-      alert(`Successfully deleted ${result.deleted} legacy photo(s).`);
+      alert(`Successfully deleted ${result.deletedCount} legacy photo(s).`);
       
       // Refresh the list
       fetchPhotos();
@@ -303,7 +300,7 @@ const AdminPhotos = () => {
                   onClick={handleCleanupLegacy}
                   className="px-4 py-2 bg-destructive text-destructive-foreground rounded-lg text-sm font-display hover:opacity-90"
                 >
-                  Delete {legacyCount} Legacy Row{legacyCount !== 1 ? "s" : ""}
+                  Clean legacy rows
                 </button>
               )}
               <button
@@ -357,7 +354,7 @@ const AdminPhotos = () => {
                     ) : (
                       <div className="w-full aspect-square rounded-lg bg-muted flex items-center justify-center border-2 border-dashed border-muted-foreground/20">
                         <p className="text-xs text-muted-foreground text-center px-2">
-                          Legacy row: missing URL
+                          Legacy: missing URL
                         </p>
                       </div>
                     )}
