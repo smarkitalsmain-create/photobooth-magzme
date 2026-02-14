@@ -10,6 +10,7 @@ interface Photo {
   createdAt: string;
   url: string;
   blobUrl?: string;
+  hasUrl?: boolean;
 }
 
 const AdminPhotos = () => {
@@ -208,6 +209,45 @@ const AdminPhotos = () => {
     }
   };
 
+  const handleCleanupLegacy = async () => {
+    if (!confirm("Delete all legacy photos (missing URL)? This cannot be undone.")) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      const base = import.meta.env.VITE_API_BASE_URL || "";
+      const response = await fetch(`${base}/api/photos/cleanup`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Cleanup failed" }));
+        throw new Error(errorData.error || `Cleanup failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+      alert(`Successfully deleted ${result.deleted} legacy photo(s).`);
+      
+      // Refresh the list
+      fetchPhotos();
+    } catch (err) {
+      console.error("Error cleaning up legacy photos:", err);
+      setError(err instanceof Error ? err.message : "Failed to clean up legacy photos");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Count legacy photos (photos without URL)
+  const legacyCount = photos.filter((photo) => !photo.hasUrl).length;
+
   if (!isAuthed) {
     return (
       <div className="min-h-screen bg-background grain-overlay flex items-center justify-center px-4">
@@ -257,12 +297,22 @@ const AdminPhotos = () => {
               <ImageIcon className="w-6 h-6" />
               Captured Photos
             </h1>
-            <button
-              onClick={fetchPhotos}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-display hover:opacity-90"
-            >
-              Refresh
-            </button>
+            <div className="flex items-center gap-2">
+              {legacyCount > 0 && (
+                <button
+                  onClick={handleCleanupLegacy}
+                  className="px-4 py-2 bg-destructive text-destructive-foreground rounded-lg text-sm font-display hover:opacity-90"
+                >
+                  Delete {legacyCount} Legacy Row{legacyCount !== 1 ? "s" : ""}
+                </button>
+              )}
+              <button
+                onClick={fetchPhotos}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-display hover:opacity-90"
+              >
+                Refresh
+              </button>
+            </div>
           </div>
 
           {loading && (

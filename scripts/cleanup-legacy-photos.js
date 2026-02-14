@@ -91,10 +91,13 @@ async function cleanupLegacyPhotos() {
     
     await new Promise(resolve => setTimeout(resolve, 5000));
 
-    // Delete photos with NULL blobUrl
+    // Delete photos with NULL or empty blobUrl
     const result = await prisma.photo.deleteMany({
       where: {
-        blobUrl: null,
+        OR: [
+          { blobUrl: null },
+          { blobUrl: "" },
+        ],
       },
     });
 
