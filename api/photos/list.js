@@ -18,15 +18,21 @@ export default async function handler(req, res) {
 
     const photos = await withTimeout(
       prisma.photo.findMany({
+        where: {
+          blobUrl: { not: null },
+        },
         orderBy: { createdAt: "desc" },
         take: limit,
         select: { id: true, blobUrl: true, createdAt: true },
       }),
-      8000
+      5000
     );
 
+    // Filter out any null blobUrl (defensive)
+    const validPhotos = photos.filter((photo) => photo.blobUrl && photo.blobUrl.trim() !== "");
+
     // Return blobUrl directly (canonical field)
-    const items = photos.map((photo) => ({
+    const items = validPhotos.map((photo) => ({
       id: photo.id,
       blobUrl: photo.blobUrl,
       createdAt: photo.createdAt,
@@ -35,11 +41,17 @@ export default async function handler(req, res) {
     res.status(200).end(JSON.stringify({ items }));
   } catch (err) {
     const isTimeout = String(err?.message || "").includes("TIMEOUT");
+    // On timeout, return empty list instead of error (fail-safe)
+    if (isTimeout) {
+      res.status(200).end(JSON.stringify({ items: [] }));
+      return;
+    }
+    // On other errors, return error JSON
     res
-      .status(isTimeout ? 504 : 500)
+      .status(500)
       .end(
         JSON.stringify({
-          error: isTimeout ? "PHOTO_LIST_TIMEOUT" : "PHOTO_LIST_ERROR",
+          error: "PHOTO_LIST_ERROR",
           message: err?.message || String(err),
         })
       );
