@@ -146,11 +146,8 @@ export default async function handler(req) {
             new Response(
               JSON.stringify({
                 id: photo.id,
-                originalName: photo.originalName,
-                mimeType: photo.mimeType,
-                size: photo.size,
+                blobUrl: photo.blobUrl, // Canonical field
                 createdAt: photo.createdAt,
-                url: photo.blobUrl,
               }),
               {
                 status: 201,

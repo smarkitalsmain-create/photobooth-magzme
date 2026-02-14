@@ -132,15 +132,15 @@ const AdminPhotos = () => {
         return;
       }
       
-      // Map items to photos format (API returns: id, url, createdAt)
+      // Map items to photos format (API returns: id, blobUrl, createdAt)
       const mappedPhotos = data.items.map((item: any) => ({
         id: item.id,
         originalName: item.originalName || `Photo ${item.id.slice(0, 8)}`,
         mimeType: "image/png", // Default since not in response
         size: item.size || 0,
         createdAt: item.createdAt,
-        url: item.url,
-        blobUrl: item.url, // Use url as blobUrl for compatibility
+        blobUrl: item.blobUrl || null, // Canonical field - may be null for legacy rows
+        url: item.blobUrl || null, // Keep for backward compatibility
       }));
       
       setPhotos(mappedPhotos);
@@ -155,9 +155,9 @@ const AdminPhotos = () => {
 
   const handleDownload = async (photo: Photo) => {
     try {
-      // Use blobUrl if available, otherwise use url
-      const photoUrl = photo.blobUrl || photo.url;
-      if (!photoUrl) {
+      // Use blobUrl (canonical field)
+      const photoUrl = photo.blobUrl;
+      if (!photoUrl || photoUrl.trim() === "") {
         alert("Photo URL not available");
         return;
       }
@@ -279,13 +279,14 @@ const AdminPhotos = () => {
           {!loading && !error && photos.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {photos.map((photo) => {
-                const photoUrl = photo.blobUrl || photo.url;
+                const photoUrl = photo.blobUrl;
+                const hasUrl = photoUrl && photoUrl.trim() !== "";
                 return (
                   <div
                     key={photo.id}
                     className="rounded-xl border border-border bg-card/80 p-4 flex flex-col gap-3"
                   >
-                    {photoUrl && (
+                    {hasUrl ? (
                       <div className="w-full aspect-square rounded-lg overflow-hidden bg-muted flex items-center justify-center">
                         <img
                           src={photoUrl}
@@ -296,6 +297,12 @@ const AdminPhotos = () => {
                             target.style.display = "none";
                           }}
                         />
+                      </div>
+                    ) : (
+                      <div className="w-full aspect-square rounded-lg bg-muted flex items-center justify-center">
+                        <p className="text-xs text-muted-foreground text-center px-2">
+                          Photo URL not available
+                        </p>
                       </div>
                     )}
                     <div className="space-y-1">
@@ -309,7 +316,8 @@ const AdminPhotos = () => {
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleDownload(photo)}
-                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-xs font-display hover:opacity-90"
+                        disabled={!hasUrl}
+                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-xs font-display hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Download className="w-4 h-4" />
                         Download

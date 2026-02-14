@@ -25,10 +25,10 @@ export default async function handler(req, res) {
       8000
     );
 
-    // Map blobUrl to url in response (safe fallback if blobUrl is null)
+    // Return blobUrl directly (canonical field)
     const items = photos.map((photo) => ({
       id: photo.id,
-      url: photo.blobUrl ?? null,
+      blobUrl: photo.blobUrl,
       createdAt: photo.createdAt,
     }));
 
