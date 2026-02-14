@@ -1,20 +1,33 @@
 {
-  "rewrites": [
+  "builds": [
     {
-      "source": "/api/:path*",
-      "destination": "/api/:path*"
+      "src": "api/**/*.js",
+      "use": "@vercel/node"
     },
     {
-      "source": "/admin",
-      "destination": "/api/admin"
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "^/api/(.*)$",
+      "dest": "/api/$1"
     },
     {
-      "source": "/admin/:path*",
-      "destination": "/api/admin"
+      "src": "^/admin/?$",
+      "dest": "/api/admin"
     },
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "src": "^/admin/(.*)$",
+      "dest": "/api/admin"
+    },
+    {
+      "src": "^(?!/api/).*",
+      "dest": "/index.html"
     }
   ]
 }
