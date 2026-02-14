@@ -157,8 +157,8 @@ const AdminPhotos = () => {
     try {
       // Use blobUrl (canonical field)
       const photoUrl = photo.blobUrl;
-      if (!photoUrl || photoUrl.trim() === "") {
-        alert("Photo URL not available");
+      if (!photoUrl || photoUrl.trim() === "" || photoUrl === "MISSING_BLOB_URL") {
+        alert("Photo URL not available. This is a legacy photo without a downloadable URL.");
         return;
       }
       
@@ -280,7 +280,8 @@ const AdminPhotos = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {photos.map((photo) => {
                 const photoUrl = photo.blobUrl;
-                const hasUrl = photoUrl && photoUrl.trim() !== "";
+                const isMissingUrl = !photoUrl || photoUrl.trim() === "" || photoUrl === "MISSING_BLOB_URL";
+                const hasUrl = !isMissingUrl;
                 return (
                   <div
                     key={photo.id}
@@ -301,7 +302,9 @@ const AdminPhotos = () => {
                     ) : (
                       <div className="w-full aspect-square rounded-lg bg-muted flex items-center justify-center">
                         <p className="text-xs text-muted-foreground text-center px-2">
-                          Photo URL not available
+                          {photoUrl === "MISSING_BLOB_URL" 
+                            ? "Legacy photo – URL not available"
+                            : "Photo URL not available"}
                         </p>
                       </div>
                     )}

@@ -132,7 +132,12 @@ export default async function handler(req) {
             token: process.env.BLOB_READ_WRITE_TOKEN,
           });
 
-          // Save metadata to database
+          // Safety check: Reject if blob URL is missing
+          if (!blob.url || blob.url.trim() === "") {
+            throw new Error("Blob upload succeeded but URL is missing");
+          }
+
+          // Save metadata to database (blobUrl is guaranteed to be set)
           const photo = await prisma.photo.create({
             data: {
               originalName: fileName,
