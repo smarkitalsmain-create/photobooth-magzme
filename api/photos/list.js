@@ -25,17 +25,15 @@ export default async function handler(req, res) {
       5000
     );
 
-    // Return all photos with hasUrl and status flags
-    const items = photos.map((photo) => {
-      const url = photo.blobUrl ?? null;
-      const hasUrl = Boolean(url && url.trim().length > 0);
+    // Return all photos with hasUrl flag
+    const items = photos.map((p) => {
+      const url = (p.blobUrl ?? "").trim() || null;
       return {
-        id: photo.id,
+        id: p.id,
         blobUrl: url,
-        size: photo.size ?? 0,
-        createdAt: photo.createdAt,
-        hasUrl: hasUrl,
-        status: hasUrl ? "ready" : "legacy_missing_url",
+        hasUrl: !!url,
+        createdAt: p.createdAt,
+        size: p.size ?? null,
       };
     });
 
