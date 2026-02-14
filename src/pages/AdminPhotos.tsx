@@ -35,21 +35,24 @@ const AdminPhotos = () => {
       setLoading(true);
       setError(null);
       
+      // Use API base URL from env if available
+      const base = import.meta.env.VITE_API_BASE_URL || "";
+      
       // Create AbortController for timeout (20 seconds to avoid false failures)
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 20000);
       
       let response;
       try {
-        // Fetch ONLY /api/photos/list (not /admin/photos, not /photos, not absolute domain)
-        response = await fetch("/api/photos/list?limit=50", {
+        // Fetch absolute API route
+        response = await fetch(`${base}/api/photos/list?limit=50`, {
           signal: controller.signal,
         });
         clearTimeout(timeoutId);
       } catch (fetchError) {
         clearTimeout(timeoutId);
         if (fetchError instanceof Error && fetchError.name === "AbortError") {
-          setError("Request timed out. The server may be slow. Please try again.");
+          setError("Request timed out. Please try again.");
           setLoading(false);
           return;
         }
@@ -66,11 +69,16 @@ const AdminPhotos = () => {
           // Try to parse as JSON for better error message
           try {
             const errorData = JSON.parse(errorText);
-            // Handle TIMEOUT error specifically
-            if (errorData.error === "TIMEOUT") {
+            // Handle timeout and error messages from API
+            if (errorData.error === "PHOTO_LIST_TIMEOUT" || errorData.error === "TIMEOUT") {
               errorMessage = "Request timed out. Please try again.";
+            } else if (errorData.error) {
+              errorMessage = errorData.error;
+              if (errorData.message) {
+                errorMessage += `: ${errorData.message}`;
+              }
             } else {
-              errorMessage = errorData.error || errorMessage;
+              errorMessage = errorData.message || errorMessage;
             }
           } catch {
             // Not JSON, use text as-is if it's short
@@ -104,7 +112,7 @@ const AdminPhotos = () => {
         return;
       }
       
-      // Expect { items: [...], nextCursor: ... } format
+      // Expect { items: [...] } format
       if (!data || typeof data !== "object") {
         setError("Invalid response format: expected object");
         setLoading(false);
@@ -124,7 +132,7 @@ const AdminPhotos = () => {
         return;
       }
       
-      // Map items to photos format (API returns: id, url, createdAt, originalName, size)
+      // Map items to photos format (API returns: id, url, createdAt)
       const mappedPhotos = data.items.map((item: any) => ({
         id: item.id,
         originalName: item.originalName || `Photo ${item.id.slice(0, 8)}`,
