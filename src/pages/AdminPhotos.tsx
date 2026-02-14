@@ -35,55 +35,98 @@ const AdminPhotos = () => {
       setLoading(true);
       setError(null);
       
-      // Create AbortController for timeout (10 seconds)
+      // Create AbortController for timeout (6 seconds - slightly longer than server 5s timeout)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
       
       let response;
       try {
         // Fetch ONLY /api/photos/list (not /admin/photos, not /photos, not absolute domain)
-        response = await fetch("/api/photos/list?limit=100", {
+        response = await fetch("/api/photos/list?limit=50", {
           signal: controller.signal,
         });
         clearTimeout(timeoutId);
       } catch (fetchError) {
         clearTimeout(timeoutId);
         if (fetchError instanceof Error && fetchError.name === "AbortError") {
-          throw new Error("Request timed out. Please try again.");
+          setError("Request timed out. The server may be slow. Please try again.");
+          setLoading(false);
+          return;
         }
-        throw fetchError;
+        setError("Network error. Please check your connection and try again.");
+        setLoading(false);
+        return;
       }
       
       // Check if response is OK (non-200 responses)
       if (!response.ok) {
-        const errorText = await response.text();
-        // Try to parse as JSON for better error message
+        let errorMessage = `Failed to fetch photos: ${response.status}`;
         try {
-          const errorData = JSON.parse(errorText);
-          throw new Error(errorData.error || `Failed to fetch photos: ${response.status}`);
+          const errorText = await response.text();
+          // Try to parse as JSON for better error message
+          try {
+            const errorData = JSON.parse(errorText);
+            errorMessage = errorData.error || errorMessage;
+            if (errorData.details) {
+              errorMessage += ` (${errorData.details})`;
+            }
+          } catch {
+            // Not JSON, use text as-is if it's short
+            if (errorText && errorText.length < 200) {
+              errorMessage = errorText;
+            }
+          }
         } catch {
-          throw new Error(`Failed to fetch photos: ${response.status} ${response.statusText}`);
+          // Failed to read error text, use default
         }
+        setError(errorMessage);
+        setLoading(false);
+        return;
       }
 
       // Check content type to ensure we got JSON
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
-        throw new Error("Server returned non-JSON response. Please check the API endpoint.");
+        setError("Server returned non-JSON response. Please check the API endpoint.");
+        setLoading(false);
+        return;
       }
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        console.error("JSON parse error:", parseError);
+        setError("Failed to parse server response. The API may have returned invalid JSON.");
+        setLoading(false);
+        return;
+      }
       
-      // Expect { photos: [...] } format
+      // Expect { items: [...], nextCursor: ... } format
       if (!data || typeof data !== "object") {
-        throw new Error("Invalid response format: expected object");
+        setError("Invalid response format: expected object");
+        setLoading(false);
+        return;
       }
       
-      if (!Array.isArray(data.photos)) {
-        throw new Error("Invalid response format: photos field must be an array");
+      if (!Array.isArray(data.items)) {
+        setError("Invalid response format: items field must be an array");
+        setLoading(false);
+        return;
       }
       
-      setPhotos(data.photos);
+      // Map items to photos format (items have url, not blobUrl)
+      const mappedPhotos = data.items.map((item: any) => ({
+        id: item.id,
+        originalName: item.originalName,
+        mimeType: "image/png", // Default since not in response
+        size: item.size,
+        createdAt: item.createdAt,
+        url: item.url,
+        blobUrl: item.url, // Use url as blobUrl for compatibility
+      }));
+      
+      setPhotos(mappedPhotos);
     } catch (err) {
       console.error("Error fetching photos:", err);
       setError(err instanceof Error ? err.message : "Failed to load photos");
