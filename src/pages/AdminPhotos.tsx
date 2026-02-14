@@ -34,14 +34,38 @@ const AdminPhotos = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch("/api/photos?limit=100");
+      const response = await fetch("/api/photos/list?limit=100");
+      
+      // Check if response is OK
       if (!response.ok) {
-        throw new Error(`Failed to fetch photos: ${response.status}`);
+        const errorText = await response.text();
+        // Try to parse as JSON for better error message
+        try {
+          const errorData = JSON.parse(errorText);
+          throw new Error(errorData.error || `Failed to fetch photos: ${response.status}`);
+        } catch {
+          throw new Error(`Failed to fetch photos: ${response.status} ${response.statusText}`);
+        }
       }
+
+      // Check content type to ensure we got JSON
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Server returned non-JSON response. Please check the API endpoint.");
+      }
+
       const data = await response.json();
-      // Handle both old format (photos array) and new format (direct array)
-      const photoList = Array.isArray(data.photos) ? data.photos : (Array.isArray(data) ? data : []);
-      setPhotos(photoList);
+      
+      // Expect { photos: [...] } format
+      if (!data || typeof data !== "object") {
+        throw new Error("Invalid response format: expected object");
+      }
+      
+      if (!Array.isArray(data.photos)) {
+        throw new Error("Invalid response format: photos field must be an array");
+      }
+      
+      setPhotos(data.photos);
     } catch (err) {
       console.error("Error fetching photos:", err);
       setError(err instanceof Error ? err.message : "Failed to load photos");
