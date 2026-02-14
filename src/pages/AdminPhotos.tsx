@@ -34,9 +34,27 @@ const AdminPhotos = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch("/api/photos/list?limit=100");
       
-      // Check if response is OK
+      // Create AbortController for timeout (10 seconds)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
+      let response;
+      try {
+        // Fetch ONLY /api/photos/list (not /admin/photos, not /photos, not absolute domain)
+        response = await fetch("/api/photos/list?limit=100", {
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        if (fetchError instanceof Error && fetchError.name === "AbortError") {
+          throw new Error("Request timed out. Please try again.");
+        }
+        throw fetchError;
+      }
+      
+      // Check if response is OK (non-200 responses)
       if (!response.ok) {
         const errorText = await response.text();
         // Try to parse as JSON for better error message

@@ -1,15 +1,27 @@
 /**
  * GET /api/photos/list
  * List photos (public API)
- * Returns JSON: { photos: [...] }
+ * Returns JSON: { photos: [...] } within a few seconds
+ * Server-side safeguards: limit 200, order by newest, 405 for non-GET
  */
 
 export const config = { runtime: "nodejs" };
 
 import { prisma } from "../_lib/prisma.js";
 
+// Timeout helper using Promise.race
+function withTimeout(promise, timeoutMs) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Timeout")), timeoutMs)
+    ),
+  ]);
+}
+
 export default async function handler(req) {
   try {
+    // Return 405 for non-GET
     if (req.method !== "GET") {
       return new Response(JSON.stringify({ error: "Method not allowed" }), {
         status: 405,
@@ -28,28 +40,57 @@ export default async function handler(req) {
       );
     }
 
-    const limit = Math.min(parseInt(new URL(req.url).searchParams.get("limit") || "100", 10) || 100, 200);
-    const skip = parseInt(new URL(req.url).searchParams.get("skip") || "0", 10) || 0;
+    // Parse query parameters safely
+    let url;
+    try {
+      url = new URL(req.url);
+    } catch (err) {
+      return new Response(
+        JSON.stringify({ error: "Invalid request URL" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
 
-    // Get photos from database
+    // Server-side safeguards: limit query size (take 200 max) and order by newest
+    const limit = Math.min(parseInt(url.searchParams.get("limit") || "100", 10) || 100, 200);
+    const skip = Math.max(0, parseInt(url.searchParams.get("skip") || "0", 10) || 0);
+
+    // Get photos from database with 8s timeout
     let photos = [];
     try {
-      photos = await prisma.photo.findMany({
-        orderBy: { createdAt: "desc" },
-        take: limit,
-        skip,
-        select: {
-          id: true,
-          originalName: true,
-          mimeType: true,
-          size: true,
-          createdAt: true,
-          blobUrl: true,
-          // Include url for backward compatibility (derived from blobUrl)
-        },
-      });
+      photos = await withTimeout(
+        prisma.photo.findMany({
+          orderBy: { createdAt: "desc" },
+          take: limit,
+          skip,
+          select: {
+            id: true,
+            originalName: true,
+            mimeType: true,
+            size: true,
+            createdAt: true,
+            blobUrl: true,
+          },
+        }),
+        8000 // 8 second timeout
+      );
     } catch (dbError) {
       console.error("Database error:", dbError);
+      
+      // Check if it was a timeout
+      if (dbError.message === "Timeout") {
+        return new Response(
+          JSON.stringify({ error: "Database query timeout" }),
+          {
+            status: 504,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
+      
       return new Response(
         JSON.stringify({ error: "Database error" }),
         {
