@@ -13,13 +13,13 @@ datasource db {
 
 model Photo {
   id          String   @id @default(uuid())
-  originalName String
-  mimeType    String
-  size        Int      // size in bytes
-  storagePath String?  // legacy filesystem path (optional for backward compatibility)
-  blobUrl     String?  // Vercel Blob URL (optional - legacy rows may be null)
+  blobUrl     String?
+  storagePath String?   // MUST be optional
+  size        Int?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  originalName String?
+  mimeType    String?
 
   @@index([createdAt])
   @@map("photos")
