@@ -126,6 +126,8 @@ export default async function handler(req) {
         }
 
         try {
+          console.log("UPLOAD_START", { fileName, size: fileData.length });
+
           // Upload to Vercel Blob
           const blob = await put(fileName, fileData, {
             access: "public",
@@ -137,21 +139,29 @@ export default async function handler(req) {
             throw new Error("Blob upload succeeded but URL is missing");
           }
 
+          console.log("BLOB_UPLOADED", { id: "uploaded", blobUrlLength: blob.url.length });
+
           // Save metadata to database (blobUrl is guaranteed to be set)
+          // DB insert happens ONLY after blob upload succeeds
           const photo = await prisma.photo.create({
             data: {
               originalName: fileName,
               mimeType: mimeType || "image/png",
               size: fileData.length,
               blobUrl: blob.url,
+              createdAt: new Date(),
             },
           });
+
+          console.log("DB_ROW_CREATED", { id: photo.id });
 
           resolve(
             new Response(
               JSON.stringify({
+                ok: true,
                 id: photo.id,
-                blobUrl: photo.blobUrl, // Canonical field
+                blobUrl: photo.blobUrl,
+                url: photo.blobUrl, // Also include 'url' for backward compatibility
                 createdAt: photo.createdAt,
               }),
               {
@@ -162,6 +172,7 @@ export default async function handler(req) {
           );
         } catch (error) {
           console.error("Error uploading photo:", error);
+          // If blob upload fails, DO NOT create DB row
           resolve(
             new Response(JSON.stringify({ error: "Error uploading photo" }), {
               status: 500,
