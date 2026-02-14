@@ -158,28 +158,47 @@ const AdminPhotos = () => {
 
   const handleDownload = async (photo: Photo) => {
     try {
-      // Use blobUrl (canonical field) - should always be present
+      // Use blobUrl (canonical field)
       const photoUrl = photo.blobUrl;
-      if (!photoUrl || photoUrl.trim() === "") {
-        alert("Photo URL not available.");
+      
+      // Guard against legacy/test rows - must be valid HTTPS URL
+      if (!photoUrl || photoUrl.trim() === "" || !photoUrl.startsWith("https://")) {
+        alert("Invalid photo URL. This photo cannot be downloaded.");
         return;
       }
       
-      // For download, we can use the admin download endpoint or direct blob URL
-      // Using direct blob URL for simplicity
-      const response = await fetch(photoUrl);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = photo.originalName || `photo-${photo.id}.jpg`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
+      // Fetch the image from blobUrl
+      let response;
+      try {
+        response = await fetch(photoUrl);
+      } catch (fetchError) {
+        alert("Invalid file URL. Unable to download photo.");
+        return;
+      }
+      
+      // Check if response is OK
+      if (!response.ok) {
+        alert("Invalid file URL. The photo file is not available.");
+        return;
+      }
+      
+      // Convert to blob and trigger download
+      try {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = photo.originalName || `photo-${photo.id}.jpg`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      } catch (blobError) {
+        alert("Failed to process photo file. Please try again.");
+      }
     } catch (err) {
-      console.error("Error downloading photo:", err);
-      alert("Failed to download photo");
+      // Catch any uncaught errors
+      alert("Failed to download photo. Please try again.");
     }
   };
 
@@ -333,13 +352,16 @@ const AdminPhotos = () => {
               {photos.map((photo) => {
                 const photoUrl = photo.blobUrl;
                 const hasUrl = photo.hasUrl ?? Boolean(photoUrl && photoUrl.trim() !== "");
+                // Guard against legacy/test rows - must be valid HTTPS URL
+                const isValidUrl = hasUrl && photoUrl && photoUrl.startsWith("https://");
+                const isVercelBlob = isValidUrl && photoUrl.includes("vercel-storage.com");
                 
                 return (
                   <div
                     key={photo.id}
                     className="rounded-xl border border-border bg-card/80 p-4 flex flex-col gap-3"
                   >
-                    {hasUrl ? (
+                    {isValidUrl ? (
                       <div className="w-full aspect-square rounded-lg overflow-hidden bg-muted flex items-center justify-center">
                         <img
                           src={photoUrl!}
@@ -354,7 +376,7 @@ const AdminPhotos = () => {
                     ) : (
                       <div className="w-full aspect-square rounded-lg bg-muted flex items-center justify-center border-2 border-dashed border-muted-foreground/20">
                         <p className="text-xs text-muted-foreground text-center px-2">
-                          Legacy row: missing URL
+                          {hasUrl ? "Invalid photo URL" : "Legacy row: missing URL"}
                         </p>
                       </div>
                     )}
@@ -365,11 +387,16 @@ const AdminPhotos = () => {
                       <p className="text-[11px] text-muted-foreground">
                         {formatSize(photo.size)} • {formatDate(photo.createdAt)}
                       </p>
+                      {isValidUrl && !isVercelBlob && (
+                        <p className="text-[10px] text-yellow-600 dark:text-yellow-400">
+                          ⚠️ Non-Vercel URL
+                        </p>
+                      )}
                     </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleDownload(photo)}
-                        disabled={!hasUrl}
+                        disabled={!isValidUrl}
                         className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-xs font-display hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Download className="w-4 h-4" />

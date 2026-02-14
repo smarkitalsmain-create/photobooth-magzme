@@ -129,26 +129,32 @@ export default async function handler(req) {
           console.log("UPLOAD_START", { fileName, size: fileData.length });
 
           // Upload to Vercel Blob
-          const blob = await put(fileName, fileData, {
+          const uploaded = await put(fileName, fileData, {
             access: "public",
             token: process.env.BLOB_READ_WRITE_TOKEN,
           });
 
           // Safety check: Reject if blob URL is missing
-          if (!blob.url || blob.url.trim() === "") {
+          if (!uploaded.url || uploaded.url.trim() === "") {
             throw new Error("Blob upload succeeded but URL is missing");
           }
 
-          console.log("BLOB_UPLOADED", { id: "uploaded", blobUrlLength: blob.url.length });
+          // Validate URL is a real Vercel Blob URL (not placeholder)
+          if (!uploaded.url.startsWith("https://")) {
+            throw new Error("Invalid blob URL format");
+          }
+
+          console.log("BLOB_UPLOADED", { id: "uploaded", blobUrlLength: uploaded.url.length });
 
           // Save metadata to database (blobUrl is guaranteed to be set)
           // DB insert happens ONLY after blob upload succeeds
+          // NEVER use placeholder URLs - always use uploaded.url
           const photo = await prisma.photo.create({
             data: {
               originalName: fileName,
               mimeType: mimeType || "image/png",
               size: fileData.length,
-              blobUrl: blob.url,
+              blobUrl: uploaded.url, // Use uploaded.url (real Vercel Blob URL)
               createdAt: new Date(),
             },
           });
