@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import Editor from "./pages/Editor";
 import PrintOrder from "./pages/PrintOrder";
 import Admin from "./pages/Admin";
+import AdminPhotos from "./pages/AdminPhotos";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,6 +23,7 @@ const App = () => (
           <Route path="/editor" element={<Editor />} />
           <Route path="/print-order" element={<PrintOrder />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/admin/photos" element={<AdminPhotos />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

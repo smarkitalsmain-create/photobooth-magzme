@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, LayoutTemplate, Sparkles, Lock } from "lucide-react";
+import { ArrowLeft, LayoutTemplate, Sparkles, Lock, Image as ImageIcon } from "lucide-react";
 import { BG_COLORS, FILTERS } from "@/lib/stickers";
 import { Template, TEMPLATES } from "@/lib/templates";
 import {
@@ -188,6 +188,13 @@ const Admin = () => {
         >
           <ArrowLeft className="w-5 h-5" />
           <span className="font-display text-xl text-primary">MagzME Admin</span>
+        </button>
+        <button
+          onClick={() => navigate("/admin/photos")}
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-display hover:opacity-90"
+        >
+          <ImageIcon className="w-4 h-4" />
+          Photo Management
         </button>
       </header>
 
