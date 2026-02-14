@@ -1,35 +1,18 @@
 {
-  "builds": [
-    {
-      "src": "api/**/*.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": { "distDir": "dist" }
+  "version": 2,
+  "functions": {
+    "api/**/*.js": {
+      "runtime": "nodejs20.x"
     }
-  ],
-  "routes": [
+  },
+  "rewrites": [
     {
-      "src": "^/api/admin$",
-      "dest": "/api/admin.js"
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
     },
     {
-      "src": "^/api/(.*)$",
-      "dest": "/api/$1"
-    },
-    {
-      "src": "^/admin$",
-      "dest": "/api/admin.js"
-    },
-    {
-      "src": "^/admin/(.*)$",
-      "dest": "/api/admin.js"
-    },
-    {
-      "src": "^(?!/api/).*",
-      "dest": "/index.html"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
