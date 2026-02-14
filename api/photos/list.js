@@ -26,13 +26,16 @@ export default async function handler(req, res) {
     );
 
     // Return all photos with hasUrl flag
-    const items = photos.map((photo) => ({
-      id: photo.id,
-      blobUrl: photo.blobUrl ?? null,
-      size: photo.size ?? 0,
-      createdAt: photo.createdAt,
-      hasUrl: Boolean(photo.blobUrl && photo.blobUrl.trim() !== ""),
-    }));
+    const items = photos.map((photo) => {
+      const url = photo.blobUrl ?? null;
+      return {
+        id: photo.id,
+        blobUrl: url,
+        size: photo.size ?? 0,
+        createdAt: photo.createdAt,
+        hasUrl: !!url,
+      };
+    });
 
     res.status(200).end(JSON.stringify({ photos: items }));
   } catch (err) {

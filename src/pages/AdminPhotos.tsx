@@ -307,7 +307,7 @@ const AdminPhotos = () => {
                     ) : (
                       <div className="w-full aspect-square rounded-lg bg-muted flex items-center justify-center border-2 border-dashed border-muted-foreground/20">
                         <p className="text-xs text-muted-foreground text-center px-2">
-                          Missing URL (legacy row)
+                          Legacy row: missing URL
                         </p>
                       </div>
                     )}

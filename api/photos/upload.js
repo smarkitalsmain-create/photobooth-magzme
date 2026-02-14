@@ -6,7 +6,7 @@
 export const config = { runtime: "nodejs" };
 
 import { put } from "@vercel/blob";
-import { prisma } from "../_lib/prisma.js";
+import prisma from "../_lib/prisma.js";
 import busboy from "busboy";
 
 const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_MB || "10") * 1024 * 1024;
