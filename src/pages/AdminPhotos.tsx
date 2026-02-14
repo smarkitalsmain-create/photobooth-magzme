@@ -112,39 +112,41 @@ const AdminPhotos = () => {
         return;
       }
       
-      // Expect { items: [...] } format
+      // Expect { photos: [...] } format (or { items: [...] } for backward compatibility)
       if (!data || typeof data !== "object") {
         setError("Invalid response format: expected object");
         setLoading(false);
         return;
       }
       
-      if (!Array.isArray(data.items)) {
-        setError("Invalid response format: items field must be an array");
+      // Support both formats: { photos: [...] } and { items: [...] }
+      const photosArray = Array.isArray(data.photos) ? data.photos : 
+                         Array.isArray(data.items) ? data.items : null;
+      
+      if (!photosArray) {
+        setError("Invalid response format: expected 'photos' or 'items' array");
         setLoading(false);
         return;
       }
       
-      // Handle empty items gracefully
-      if (data.items.length === 0) {
+      // Handle empty array gracefully
+      if (photosArray.length === 0) {
         setPhotos([]);
         setLoading(false);
         return;
       }
       
-      // Map items to photos format (API returns: id, blobUrl, createdAt)
-      // Filter out any photos with missing blobUrl (defensive - API should already filter)
-      const mappedPhotos = data.items
-        .filter((item: any) => item.blobUrl && item.blobUrl.trim() !== "")
-        .map((item: any) => ({
-          id: item.id,
-          originalName: item.originalName || `Photo ${item.id.slice(0, 8)}`,
-          mimeType: "image/png", // Default since not in response
-          size: item.size || 0,
-          createdAt: item.createdAt,
-          blobUrl: item.blobUrl, // Guaranteed to be present after filter
-          url: item.blobUrl, // Keep for backward compatibility
-        }));
+      // Map photos format (API returns: id, blobUrl, size, createdAt, hasUrl)
+      const mappedPhotos = photosArray.map((item: any) => ({
+        id: item.id,
+        originalName: item.originalName || `Photo ${item.id.slice(0, 8)}`,
+        mimeType: "image/png", // Default since not in response
+        size: item.size ?? 0,
+        createdAt: item.createdAt,
+        blobUrl: item.blobUrl ?? null,
+        url: item.blobUrl ?? null, // Keep for backward compatibility
+        hasUrl: item.hasUrl ?? Boolean(item.blobUrl && item.blobUrl.trim() !== ""),
+      }));
       
       setPhotos(mappedPhotos);
     } catch (err) {
@@ -283,26 +285,32 @@ const AdminPhotos = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {photos.map((photo) => {
                 const photoUrl = photo.blobUrl;
-                // All photos should have valid blobUrl (filtered by API and frontend)
-                if (!photoUrl || photoUrl.trim() === "") {
-                  return null; // Skip invalid photos
-                }
+                const hasUrl = photo.hasUrl ?? Boolean(photoUrl && photoUrl.trim() !== "");
+                
                 return (
                   <div
                     key={photo.id}
                     className="rounded-xl border border-border bg-card/80 p-4 flex flex-col gap-3"
                   >
-                    <div className="w-full aspect-square rounded-lg overflow-hidden bg-muted flex items-center justify-center">
-                      <img
-                        src={photoUrl}
-                        alt={photo.originalName}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = "none";
-                        }}
-                      />
-                    </div>
+                    {hasUrl ? (
+                      <div className="w-full aspect-square rounded-lg overflow-hidden bg-muted flex items-center justify-center">
+                        <img
+                          src={photoUrl!}
+                          alt={photo.originalName}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = "none";
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-full aspect-square rounded-lg bg-muted flex items-center justify-center border-2 border-dashed border-muted-foreground/20">
+                        <p className="text-xs text-muted-foreground text-center px-2">
+                          Missing URL (legacy row)
+                        </p>
+                      </div>
+                    )}
                     <div className="space-y-1">
                       <p className="text-xs font-semibold text-foreground truncate">
                         {photo.originalName}
@@ -314,7 +322,8 @@ const AdminPhotos = () => {
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleDownload(photo)}
-                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-xs font-display hover:opacity-90"
+                        disabled={!hasUrl}
+                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-xs font-display hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Download className="w-4 h-4" />
                         Download
