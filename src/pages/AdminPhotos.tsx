@@ -35,9 +35,9 @@ const AdminPhotos = () => {
       setLoading(true);
       setError(null);
       
-      // Create AbortController for timeout (6 seconds - slightly longer than server 5s timeout)
+      // Create AbortController for timeout (20 seconds to avoid false failures)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
       
       let response;
       try {

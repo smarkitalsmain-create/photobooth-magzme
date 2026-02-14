@@ -7,7 +7,7 @@
 
 export const config = { runtime: "nodejs" };
 
-import { prisma } from "../_lib/prisma.js";
+import prisma from "../_lib/prisma.js";
 
 // Hard timeout guard (5 seconds)
 function withTimeout(promise, timeoutMs) {
@@ -96,7 +96,10 @@ export default async function handler(req) {
       
       console.error("Database error:", dbError);
       return new Response(
-        JSON.stringify({ error: "Database error" }),
+        JSON.stringify({ 
+          error: "PHOTO_LIST_ERROR",
+          message: dbError.message || "Database query failed"
+        }),
         {
           status: 500,
           headers: { "Content-Type": "application/json" },
@@ -121,7 +124,10 @@ export default async function handler(req) {
   } catch (error) {
     console.error("Error in photos list handler:", error);
     return new Response(
-      JSON.stringify({ error: "Internal server error" }),
+      JSON.stringify({ 
+        error: "PHOTO_LIST_ERROR",
+        message: error.message || "Internal server error"
+      }),
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
