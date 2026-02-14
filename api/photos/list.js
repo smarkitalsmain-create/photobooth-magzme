@@ -1,21 +1,20 @@
 /**
  * GET /api/photos/list
- * List photos with cursor-based pagination
- * Returns JSON: { items: [...], nextCursor: <id|null> }
- * Always returns JSON, never HTML
- * 5s server-side timeout guard
+ * Fast JSON endpoint for listing photos
+ * Always returns JSON, never hangs
+ * 5s hard timeout guard
  */
 
 export const config = { runtime: "nodejs" };
 
 import { prisma } from "../_lib/prisma.js";
 
-// Timeout helper using Promise.race (5 seconds)
+// Hard timeout guard (5 seconds)
 function withTimeout(promise, timeoutMs) {
   return Promise.race([
     promise,
     new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("Timeout")), timeoutMs)
+      setTimeout(() => reject(new Error("TIMEOUT")), timeoutMs)
     ),
   ]);
 }
@@ -25,20 +24,18 @@ export default async function handler(req) {
     // Return 405 for non-GET
     if (req.method !== "GET") {
       return new Response(
-        JSON.stringify({ error: "Method not allowed", details: "Only GET requests are supported" }),
+        JSON.stringify({ error: "Method not allowed" }),
         {
           status: 405,
           headers: { "Content-Type": "application/json" },
-      });
+        }
+      );
     }
 
     // Hard check: DATABASE_URL required
     if (!process.env.DATABASE_URL) {
       return new Response(
-        JSON.stringify({ 
-          error: "Database not configured",
-          details: "DATABASE_URL environment variable is missing"
-        }),
+        JSON.stringify({ error: "Database not configured" }),
         {
           status: 500,
           headers: { "Content-Type": "application/json" },
@@ -52,7 +49,7 @@ export default async function handler(req) {
       url = new URL(req.url);
     } catch (err) {
       return new Response(
-        JSON.stringify({ error: "Invalid request URL", details: err.message }),
+        JSON.stringify({ error: "Invalid request URL" }),
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
@@ -67,29 +64,31 @@ export default async function handler(req) {
       200
     );
 
-    // Parse cursor (optional)
+    // Parse cursor (optional id)
     const cursor = url.searchParams.get("cursor") || null;
 
-    // Build Prisma query with cursor-based pagination
+    // Build Prisma query - select minimal fields: id, blobUrl (as url), createdAt
+    // Note: UI also needs originalName and size, but keeping query minimal per requirements
     const queryOptions = {
       orderBy: { createdAt: "desc" },
       take: limit + 1, // Fetch one extra to determine if there's a next page
       select: {
         id: true,
-        originalName: true,
-        blobUrl: true,
-        size: true,
+        blobUrl: true, // Will map to url in response
         createdAt: true,
+        // Include originalName and size for UI display (needed for admin page)
+        originalName: true,
+        size: true,
       },
     };
 
-    // Add cursor if provided
+    // Add cursor if provided (use cursor + skip:1)
     if (cursor) {
-      queryOptions.skip = 1; // Skip the cursor item itself
+      queryOptions.skip = 1;
       queryOptions.cursor = { id: cursor };
     }
 
-    // Get photos from database with 5s timeout
+    // Get photos from database with 5s hard timeout
     let photos = [];
     try {
       photos = await withTimeout(
@@ -97,15 +96,10 @@ export default async function handler(req) {
         5000 // 5 second timeout
       );
     } catch (dbError) {
-      console.error("Database error:", dbError);
-      
       // Check if it was a timeout
-      if (dbError.message === "Timeout") {
+      if (dbError.message === "TIMEOUT") {
         return new Response(
-          JSON.stringify({ 
-            error: "Database query timeout",
-            details: "Query exceeded 5 second limit"
-          }),
+          JSON.stringify({ error: "TIMEOUT" }),
           {
             status: 504,
             headers: { "Content-Type": "application/json" },
@@ -113,11 +107,9 @@ export default async function handler(req) {
         );
       }
       
+      console.error("Database error:", dbError);
       return new Response(
-        JSON.stringify({ 
-          error: "Database error",
-          details: dbError.message || "Failed to query database"
-        }),
+        JSON.stringify({ error: "Database error" }),
         {
           status: 500,
           headers: { "Content-Type": "application/json" },
@@ -130,13 +122,13 @@ export default async function handler(req) {
     const items = hasNextPage ? photos.slice(0, limit) : photos;
     const nextCursor = hasNextPage && items.length > 0 ? items[items.length - 1].id : null;
 
-    // Format items with url field (use blobUrl as primary)
+    // Format items - include id, url (from blobUrl), createdAt, plus originalName and size for UI
     const formattedItems = items.map((photo) => ({
       id: photo.id,
-      originalName: photo.originalName,
       url: photo.blobUrl || null,
-      size: photo.size,
       createdAt: photo.createdAt,
+      originalName: photo.originalName || null,
+      size: photo.size || 0,
     }));
 
     return new Response(
@@ -152,10 +144,7 @@ export default async function handler(req) {
   } catch (error) {
     console.error("Error in photos list handler:", error);
     return new Response(
-      JSON.stringify({ 
-        error: "Internal server error",
-        details: error.message || "An unexpected error occurred"
-      }),
+      JSON.stringify({ error: "Internal server error" }),
       {
         status: 500,
         headers: { "Content-Type": "application/json" },

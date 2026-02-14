@@ -66,9 +66,11 @@ const AdminPhotos = () => {
           // Try to parse as JSON for better error message
           try {
             const errorData = JSON.parse(errorText);
-            errorMessage = errorData.error || errorMessage;
-            if (errorData.details) {
-              errorMessage += ` (${errorData.details})`;
+            // Handle TIMEOUT error specifically
+            if (errorData.error === "TIMEOUT") {
+              errorMessage = "Request timed out. Please try again.";
+            } else {
+              errorMessage = errorData.error || errorMessage;
             }
           } catch {
             // Not JSON, use text as-is if it's short
@@ -115,12 +117,19 @@ const AdminPhotos = () => {
         return;
       }
       
-      // Map items to photos format (items have url, not blobUrl)
+      // Handle empty items gracefully
+      if (data.items.length === 0) {
+        setPhotos([]);
+        setLoading(false);
+        return;
+      }
+      
+      // Map items to photos format (API returns: id, url, createdAt, originalName, size)
       const mappedPhotos = data.items.map((item: any) => ({
         id: item.id,
-        originalName: item.originalName,
+        originalName: item.originalName || `Photo ${item.id.slice(0, 8)}`,
         mimeType: "image/png", // Default since not in response
-        size: item.size,
+        size: item.size || 0,
         createdAt: item.createdAt,
         url: item.url,
         blobUrl: item.url, // Use url as blobUrl for compatibility
@@ -130,6 +139,7 @@ const AdminPhotos = () => {
     } catch (err) {
       console.error("Error fetching photos:", err);
       setError(err instanceof Error ? err.message : "Failed to load photos");
+      setLoading(false);
     } finally {
       setLoading(false);
     }
