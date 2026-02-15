@@ -156,49 +156,28 @@ const AdminPhotos = () => {
     }
   };
 
-  const handleDownload = async (photo: Photo) => {
+  const handleDownload = (photo: Photo) => {
     try {
       // Use blobUrl (canonical field)
-      const photoUrl = photo.blobUrl;
+      const blobUrl = photo.blobUrl;
       
       // Guard against legacy/test rows - must be valid HTTPS URL
-      if (!photoUrl || photoUrl.trim() === "" || !photoUrl.startsWith("https://")) {
+      if (!blobUrl || blobUrl.trim() === "" || !blobUrl.startsWith("https://")) {
         alert("Invalid photo URL. This photo cannot be downloaded.");
         return;
       }
       
-      // Fetch the image from blobUrl
-      let response;
-      try {
-        response = await fetch(photoUrl);
-      } catch (fetchError) {
-        alert("Invalid file URL. Unable to download photo.");
-        return;
-      }
-      
-      // Check if response is OK
-      if (!response.ok) {
-        alert("Invalid file URL. The photo file is not available.");
-        return;
-      }
-      
-      // Convert to blob and trigger download
-      try {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = photo.originalName || `photo-${photo.id}.jpg`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-      } catch (blobError) {
-        alert("Failed to process photo file. Please try again.");
-      }
+      // Browser-native download (no fetch, no CORS issues)
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = photo.originalName || `photo-${photo.id}.jpg`;
+      a.target = "_blank"; // Open in new tab as fallback
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     } catch (err) {
-      // Catch any uncaught errors
-      alert("Failed to download photo. Please try again.");
+      // If download fails (rare), show user-friendly message
+      alert("Unable to download file. Please re-upload.");
     }
   };
 
