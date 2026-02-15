@@ -45,8 +45,8 @@ const AdminPhotos = () => {
       
       let response;
       try {
-        // Fetch absolute API route
-        response = await fetch(`${base}/api/photos?limit=50`, {
+        // Fetch absolute API route (use op=list for explicit operation)
+        response = await fetch(`${base}/api/photos?op=list&limit=50`, {
           signal: controller.signal,
         });
         clearTimeout(timeoutId);

@@ -1,6 +1,9 @@
 {
   "version": 2,
   "rewrites": [
+    { "source": "/api/photos/list", "destination": "/api/photos?op=list" },
+    { "source": "/api/photos/ping", "destination": "/api/photos?op=ping" },
+    { "source": "/api/photos/test-insert", "destination": "/api/photos?op=test-insert" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]

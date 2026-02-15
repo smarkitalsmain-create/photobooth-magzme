@@ -1,6 +1,7 @@
 /**
  * Consolidated photo API endpoint
- * Handles: GET (list), POST (upload), DELETE (cleanup)
+ * Handles all photo operations via query parameter: ?op=list|ping|test-insert
+ * Also handles POST upload and POST seed
  */
 
 export const config = { runtime: "nodejs" };
@@ -13,6 +14,48 @@ import busboy from "busboy";
 const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_MB || "10") * 1024 * 1024;
 const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
 
+// Basic Auth helper with fallback
+function requireAuth(req) {
+  const adminUser = process.env.ADMIN_USER || "Admin";
+  const adminPass = process.env.ADMIN_PASS || "magzme1234";
+
+  let authHeader = null;
+  try {
+    if (req.headers) {
+      if (typeof req.headers.get === "function") {
+        authHeader = req.headers.get("authorization");
+      } else if (req.headers.authorization) {
+        authHeader = Array.isArray(req.headers.authorization)
+          ? req.headers.authorization[0]
+          : req.headers.authorization;
+      }
+    }
+  } catch (err) {
+    // Header access failed
+  }
+
+  if (!authHeader || typeof authHeader !== "string" || !authHeader.startsWith("Basic ")) {
+    return { authorized: false };
+  }
+
+  try {
+    const base64Credentials = authHeader.split(" ")[1];
+    if (!base64Credentials) {
+      return { authorized: false };
+    }
+    const credentials = Buffer.from(base64Credentials, "base64").toString("utf-8");
+    const [username, password] = credentials.split(":");
+
+    if (username === adminUser && password === adminPass) {
+      return { authorized: true };
+    }
+  } catch (err) {
+    // Decode failed
+  }
+
+  return { authorized: false };
+}
+
 function withTimeout(promise, ms) {
   return Promise.race([
     promise,
@@ -22,48 +65,102 @@ function withTimeout(promise, ms) {
 
 export default async function handler(req, res) {
   try {
-    // GET: List photos
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+
+    const op = req.query?.op;
+
+    // GET: Route by operation
     if (req.method === "GET") {
-      res.setHeader("Content-Type", "application/json; charset=utf-8");
+      // GET /api/photos?op=ping
+      if (op === "ping") {
+        res.status(200).end(JSON.stringify({ ok: true, ts: Date.now() }));
+        return;
+      }
 
-      const limitRaw = req.query?.limit;
-      const limit = Math.max(1, Math.min(100, Number(limitRaw ?? 50) || 50));
+      // GET /api/photos?op=list&limit=50 (default operation)
+      if (op === "list" || !op) {
+        const limitRaw = req.query?.limit;
+        const limit = Math.max(1, Math.min(100, Number(limitRaw ?? 50) || 50));
 
-      const photos = await withTimeout(
-        prisma.photo.findMany({
-          where: { blobUrl: { not: null } },
-          orderBy: { createdAt: "desc" },
-          take: limit,
-          select: { id: true, blobUrl: true, size: true, createdAt: true },
-        }),
-        5000
-      );
+        const photos = await withTimeout(
+          prisma.photo.findMany({
+            where: {
+              AND: [
+                { blobUrl: { not: null } },
+                { blobUrl: { not: "" } },
+              ],
+            },
+            orderBy: { createdAt: "desc" },
+            take: limit,
+            select: { id: true, blobUrl: true, size: true, createdAt: true },
+          }),
+          5000
+        );
 
-      // Return photos as-is (no extra filtering)
-      const items = photos.map((p) => {
-        const url = (p.blobUrl ?? "").trim() || null;
-        return {
-          id: p.id,
-          blobUrl: url,
-          hasUrl: !!url,
-          createdAt: p.createdAt,
-          size: p.size ?? null,
-        };
-      });
+        const items = photos.map((p) => {
+          const url = (p.blobUrl ?? "").trim() || null;
+          return {
+            id: p.id,
+            blobUrl: url,
+            hasUrl: !!url,
+            createdAt: p.createdAt,
+            size: p.size ?? null,
+          };
+        });
 
-      res.status(200).end(JSON.stringify({ items }));
+        res.status(200).end(JSON.stringify({ items }));
+        return;
+      }
+
+      // Unknown operation
+      res.status(400).end(JSON.stringify({ error: "Unknown operation" }));
       return;
     }
 
-    // POST: Upload photo or seed
+    // POST: Route by operation or content type
     if (req.method === "POST") {
-      res.setHeader("Content-Type", "application/json; charset=utf-8");
-
-      // Check if it's JSON seed request
       const contentType = req.headers?.["content-type"] || req.headers?.["Content-Type"] || "";
       const isMultipart = contentType.includes("multipart/form-data");
 
-      // TEMPORARY: Seed endpoint for verification
+      // POST /api/photos?op=test-insert (admin required)
+      if (op === "test-insert") {
+        const auth = requireAuth(req);
+        if (!auth.authorized) {
+          res.statusCode = 401;
+          res.setHeader("WWW-Authenticate", 'Basic realm="Admin"');
+          res.end(JSON.stringify({ error: "Unauthorized" }));
+          return;
+        }
+
+        if (!process.env.DATABASE_URL) {
+          res.status(500).end(JSON.stringify({ error: "DATABASE_URL not configured" }));
+          return;
+        }
+
+        const photo = await prisma.photo.create({
+          data: {
+            originalName: "test-insert.jpg",
+            mimeType: "image/jpeg",
+            size: 0,
+            blobUrl: "https://picsum.photos/600",
+            storagePath: null,
+            createdAt: new Date(),
+          },
+        });
+
+        console.log("TEST_INSERT_OK", { id: photo.id });
+
+        res.status(201).end(
+          JSON.stringify({
+            ok: true,
+            id: photo.id,
+            blobUrl: photo.blobUrl,
+          })
+        );
+        return;
+      }
+
+      // POST /api/photos with JSON { seed: true } (admin required)
       if (!isMultipart) {
         try {
           let body = null;
@@ -76,19 +173,26 @@ export default async function handler(req, res) {
           }
 
           if (body && body.seed === true) {
-            // Check DATABASE_URL
+            const auth = requireAuth(req);
+            if (!auth.authorized) {
+              res.statusCode = 401;
+              res.setHeader("WWW-Authenticate", 'Basic realm="Admin"');
+              res.end(JSON.stringify({ error: "Unauthorized" }));
+              return;
+            }
+
             if (!process.env.DATABASE_URL) {
               res.status(500).end(JSON.stringify({ error: "DATABASE_URL not configured" }));
               return;
             }
 
-            // Insert test row with valid image URL
             const photo = await prisma.photo.create({
               data: {
                 originalName: "seed-test.jpg",
                 mimeType: "image/jpeg",
                 size: 0,
                 blobUrl: "https://picsum.photos/600",
+                storagePath: null,
                 createdAt: new Date(),
               },
             });
@@ -114,9 +218,8 @@ export default async function handler(req, res) {
         return;
       }
 
-      // Validate required environment variables
+      // POST /api/photos (multipart upload - no auth required for now)
       if (!process.env.DATABASE_URL) {
-        res.setHeader("Content-Type", "application/json; charset=utf-8");
         res.status(500).end(
           JSON.stringify({ error: "Missing required environment variable: DATABASE_URL" })
         );
@@ -124,7 +227,6 @@ export default async function handler(req, res) {
       }
 
       if (!process.env.BLOB_READ_WRITE_TOKEN) {
-        res.setHeader("Content-Type", "application/json; charset=utf-8");
         res.status(500).end(
           JSON.stringify({
             error: "Missing required environment variable: BLOB_READ_WRITE_TOKEN",
@@ -144,12 +246,8 @@ export default async function handler(req, res) {
           }
         } catch (headerError) {
           console.error("Error processing headers:", headerError);
-          return resolve(
-            new Response(JSON.stringify({ error: "Invalid request headers" }), {
-              status: 400,
-              headers: { "Content-Type": "application/json" },
-            })
-          );
+          res.status(400).end(JSON.stringify({ error: "Invalid request headers" }));
+          return;
         }
 
         const bb = busboy({
@@ -199,13 +297,11 @@ export default async function handler(req, res) {
 
         bb.on("finish", async () => {
           if (uploadError) {
-            res.setHeader("Content-Type", "application/json; charset=utf-8");
             res.status(uploadError.status).end(JSON.stringify({ error: uploadError.message }));
             return;
           }
 
           if (!fileData || !fileName) {
-            res.setHeader("Content-Type", "application/json; charset=utf-8");
             res.status(400).end(JSON.stringify({ error: "No file uploaded" }));
             return;
           }
@@ -232,52 +328,45 @@ export default async function handler(req, res) {
             console.log("BLOB_UPLOADED", { id: "uploaded", blobUrlLength: uploaded.url.length });
 
             // Save metadata to database (blobUrl is guaranteed to be set)
-            // DB insert happens ONLY after blob upload succeeds
-            // NEVER use placeholder URLs - always use uploaded.url
             const photo = await prisma.photo.create({
               data: {
                 originalName: fileName,
                 mimeType: mimeType || "image/png",
                 size: fileData.length,
-                blobUrl: uploaded.url, // Use uploaded.url (real Vercel Blob URL)
+                blobUrl: uploaded.url,
+                storagePath: null,
                 createdAt: new Date(),
               },
             });
 
             console.log("DB_ROW_CREATED", { id: photo.id });
 
-            res.setHeader("Content-Type", "application/json; charset=utf-8");
             res.status(201).end(
               JSON.stringify({
                 ok: true,
                 id: photo.id,
                 blobUrl: photo.blobUrl,
-                url: photo.blobUrl, // Also include 'url' for backward compatibility
+                url: photo.blobUrl,
                 createdAt: photo.createdAt,
               })
             );
           } catch (error) {
             console.error("Error uploading photo:", error);
-            // If blob upload fails, DO NOT create DB row
-            res.setHeader("Content-Type", "application/json; charset=utf-8");
             res.status(500).end(JSON.stringify({ error: "Error uploading photo" }));
           }
         });
 
         bb.on("error", (error) => {
           console.error("Busboy error:", error);
-          res.setHeader("Content-Type", "application/json; charset=utf-8");
           res.status(500).end(JSON.stringify({ error: "Error processing upload" }));
         });
 
-        // Handle request body - Vercel provides body as ReadableStream or ArrayBuffer
+        // Handle request body
         try {
           if (req.body) {
             if (typeof req.body.pipe === "function") {
-              // Stream
               req.body.pipe(bb);
             } else if (req.body instanceof ReadableStream) {
-              // ReadableStream
               const reader = req.body.getReader();
               const pump = async () => {
                 try {
@@ -296,17 +385,14 @@ export default async function handler(req, res) {
               };
               pump();
             } else {
-              // ArrayBuffer or Buffer
               const buffer = req.body instanceof ArrayBuffer ? Buffer.from(req.body) : req.body;
               bb.end(buffer);
             }
           } else {
-            // No body, end immediately
             bb.end();
           }
         } catch (bodyError) {
           console.error("Error handling request body:", bodyError);
-          res.setHeader("Content-Type", "application/json; charset=utf-8");
           res.status(400).end(JSON.stringify({ error: "Error processing request body" }));
         }
       });
@@ -314,28 +400,19 @@ export default async function handler(req, res) {
 
     // DELETE: Cleanup legacy photos (admin only)
     if (req.method === "DELETE") {
-      res.setHeader("Content-Type", "application/json; charset=utf-8");
-
-      // Check Basic Auth
-      const auth = checkBasicAuthSync(req);
+      const auth = requireAuth(req);
       if (!auth.authorized) {
-        res.statusCode = auth.status || 401;
-        if (auth.headers) {
-          Object.entries(auth.headers).forEach(([key, value]) => {
-            res.setHeader(key, value);
-          });
-        }
-        res.end(JSON.stringify({ error: auth.message || "Unauthorized" }));
+        res.statusCode = 401;
+        res.setHeader("WWW-Authenticate", 'Basic realm="Admin"');
+        res.end(JSON.stringify({ error: "Unauthorized" }));
         return;
       }
 
-      // Check DATABASE_URL
       if (!process.env.DATABASE_URL) {
         res.status(500).end(JSON.stringify({ error: "DATABASE_URL not configured" }));
         return;
       }
 
-      // Find and delete photos with NULL or empty blobUrl
       const result = await prisma.photo.deleteMany({
         where: {
           OR: [{ blobUrl: null }, { blobUrl: "" }],
@@ -351,7 +428,6 @@ export default async function handler(req, res) {
     }
 
     // Method not allowed
-    res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.status(405).end(JSON.stringify({ error: "Method not allowed" }));
   } catch (err) {
     const isTimeout = String(err?.message || "").includes("TIMEOUT");

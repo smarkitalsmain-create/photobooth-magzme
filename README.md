@@ -90,10 +90,44 @@ This runs:
 
 ## API Endpoints
 
-- `GET /api/photos/list?limit=50` - List photos (filters out NULL blobUrl)
-- `POST /api/photos/upload` - Upload new photo
+### Consolidated Photo API (`/api/photos`)
+
+All photo operations are handled by a single endpoint using query parameters:
+
+- `GET /api/photos?op=list&limit=50` - List photos (filters out NULL blobUrl)
+- `GET /api/photos?op=ping` - Health check endpoint
+- `POST /api/photos` - Upload new photo (multipart/form-data)
+- `POST /api/photos` with `{ seed: true }` - Seed test photo (admin required)
+- `POST /api/photos?op=test-insert` - Insert test row (admin required)
+- `DELETE /api/photos` - Cleanup legacy photos (admin required)
+
+**Legacy URLs (via rewrites):**
+- `/api/photos/list` → `/api/photos?op=list`
+- `/api/photos/ping` → `/api/photos?op=ping`
+- `/api/photos/test-insert` → `/api/photos?op=test-insert`
+
+### Other Endpoints
+
 - `GET /admin` - Admin dashboard (Basic Auth)
 - `GET /admin/photos` - Photo management (Basic Auth)
+
+### Local Testing
+
+Test the photo API endpoints locally:
+
+```bash
+# Ping endpoint
+curl -s "http://localhost:5173/api/photos?op=ping"
+
+# List photos (limit 5)
+curl -s "http://localhost:5173/api/photos?op=list&limit=5"
+
+# Seed a test photo (admin required)
+curl -s -X POST -u "Admin:magzme1234" \
+  -H "Content-Type: application/json" \
+  -d '{"seed":true}' \
+  "http://localhost:5173/api/photos"
+```
 
 ## Photo Management
 
