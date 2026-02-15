@@ -161,17 +161,16 @@ const AdminPhotos = () => {
       // Use blobUrl (canonical field)
       const blobUrl = photo.blobUrl;
       
-      // Guard against legacy/test rows - must be valid HTTPS URL
-      if (!blobUrl || blobUrl.trim() === "" || !blobUrl.startsWith("https://")) {
-        alert("Invalid photo URL. This photo cannot be downloaded.");
+      // Guard against invalid/test photos - must be Vercel Blob URL
+      if (!blobUrl || !blobUrl.includes("vercel-storage.com")) {
+        alert("Invalid or test photo. This photo cannot be downloaded.");
         return;
       }
       
       // Browser-native download (no fetch, no CORS issues)
       const a = document.createElement("a");
       a.href = blobUrl;
-      a.download = photo.originalName || `photo-${photo.id}.jpg`;
-      a.target = "_blank"; // Open in new tab as fallback
+      a.download = "";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -330,17 +329,15 @@ const AdminPhotos = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {photos.map((photo) => {
                 const photoUrl = photo.blobUrl;
-                const hasUrl = photo.hasUrl ?? Boolean(photoUrl && photoUrl.trim() !== "");
-                // Guard against legacy/test rows - must be valid HTTPS URL
-                const isValidUrl = hasUrl && photoUrl && photoUrl.startsWith("https://");
-                const isVercelBlob = isValidUrl && photoUrl.includes("vercel-storage.com");
+                // Only allow Vercel Blob URLs
+                const isValidVercelUrl = photoUrl && photoUrl.includes("vercel-storage.com");
                 
                 return (
                   <div
                     key={photo.id}
                     className="rounded-xl border border-border bg-card/80 p-4 flex flex-col gap-3"
                   >
-                    {isValidUrl ? (
+                    {isValidVercelUrl ? (
                       <div className="w-full aspect-square rounded-lg overflow-hidden bg-muted flex items-center justify-center">
                         <img
                           src={photoUrl!}
@@ -355,7 +352,7 @@ const AdminPhotos = () => {
                     ) : (
                       <div className="w-full aspect-square rounded-lg bg-muted flex items-center justify-center border-2 border-dashed border-muted-foreground/20">
                         <p className="text-xs text-muted-foreground text-center px-2">
-                          {hasUrl ? "Invalid photo URL" : "Legacy row: missing URL"}
+                          Invalid or test photo
                         </p>
                       </div>
                     )}
@@ -366,16 +363,11 @@ const AdminPhotos = () => {
                       <p className="text-[11px] text-muted-foreground">
                         {formatSize(photo.size)} • {formatDate(photo.createdAt)}
                       </p>
-                      {isValidUrl && !isVercelBlob && (
-                        <p className="text-[10px] text-yellow-600 dark:text-yellow-400">
-                          ⚠️ Non-Vercel URL
-                        </p>
-                      )}
                     </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleDownload(photo)}
-                        disabled={!isValidUrl}
+                        disabled={!isValidVercelUrl}
                         className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-xs font-display hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Download className="w-4 h-4" />
