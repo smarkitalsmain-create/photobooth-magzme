@@ -384,8 +384,11 @@ const Editor = () => {
 
       // Upload to backend - MUST succeed for photo to appear in admin
       try {
-        const result = await uploadCapturedPhoto(blob, `photobooth-${timestamp}.png`);
-        console.log("UPLOAD_RESPONSE", { id: result.id, url: result.url });
+        const fd = new FormData();
+        fd.append("file", blob, `photobooth-${timestamp}.png`);
+        const res = await fetch("/api/photos", { method: "POST", body: fd });
+        const json = await res.json();
+        console.log("UPLOAD_RESULT", json);
       } catch (uploadError) {
         console.error("Upload failed:", uploadError);
         // Log error but don't block download

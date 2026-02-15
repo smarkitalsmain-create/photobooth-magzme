@@ -309,6 +309,19 @@ export default async function handler(req, res) {
           try {
             console.log("UPLOAD_START", { fileName, size: fileData.length });
 
+            // Check BLOB_READ_WRITE_TOKEN before uploading
+            if (!process.env.BLOB_READ_WRITE_TOKEN) {
+              console.error("MISSING_BLOB_TOKEN");
+              res.status(500).end(
+                JSON.stringify({
+                  ok: false,
+                  error: "MISSING_BLOB_TOKEN",
+                  message: "Set BLOB_READ_WRITE_TOKEN in Vercel env vars",
+                })
+              );
+              return;
+            }
+
             // Upload to Vercel Blob
             const uploaded = await put(fileName, fileData, {
               access: "public",
@@ -346,8 +359,6 @@ export default async function handler(req, res) {
                 ok: true,
                 id: photo.id,
                 blobUrl: photo.blobUrl,
-                url: photo.blobUrl,
-                createdAt: photo.createdAt,
               })
             );
           } catch (error) {

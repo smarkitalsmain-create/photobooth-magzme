@@ -72,24 +72,15 @@ const PhotoFrame = ({ index, image, filter, onUpload, onRemove }: PhotoFrameProp
 
       // Upload to backend
       try {
-        const formData = new FormData();
-        formData.append("file", file);
-
-        const response = await fetch("/api/photos", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          console.log("UPLOAD_OK", result);
-        } else {
-          console.error("Upload failed:", response.status, response.statusText);
-        }
+        const fd = new FormData();
+        fd.append("file", blob, `photobooth-${Date.now()}.png`);
+        const res = await fetch("/api/photos", { method: "POST", body: fd });
+        const json = await res.json();
+        console.log("UPLOAD_RESULT", json);
       } catch (error) {
         console.error("Upload error:", error);
       }
-    }, "image/png");
+    }, "image/png", 0.95);
   }, [index, onUpload]);
 
   useEffect(() => {
