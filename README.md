@@ -77,7 +77,9 @@ Set all environment variables in Vercel Project Settings > Environment Variables
 
 ## Build & Deploy
 
-**Build:**
+### Vercel Build Process
+
+**Build Command:**
 ```bash
 npm run build
 ```
@@ -86,7 +88,32 @@ This runs:
 - `vite build` - Builds frontend
 - `prisma generate` - Generates Prisma Client (via postinstall)
 
-**No database writes during build** - migrations must be run separately.
+**Important:** 
+- **NO migrations run during build** - This prevents P1001 connection errors on Vercel
+- Prisma Client is generated automatically via `postinstall` script
+- Database migrations must be run **manually** when schema changes
+
+### Running Migrations
+
+**Before/After Deploying Schema Changes:**
+
+1. **Local Development:**
+   ```bash
+   npm run migrate:dev -- --name migration_name
+   ```
+
+2. **Production (Vercel):**
+   ```bash
+   npm run prisma:migrate:deploy
+   ```
+   
+   Or run directly in Vercel CLI:
+   ```bash
+   vercel env pull .env.local
+   npm run prisma:migrate:deploy
+   ```
+
+**Note:** Migrations should be run **after** deploying code changes, not during the build process. The build only generates the Prisma Client, it does not modify the database schema.
 
 ## API Endpoints
 
