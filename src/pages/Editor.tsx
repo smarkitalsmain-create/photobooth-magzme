@@ -362,10 +362,14 @@ const Editor = () => {
         URL.revokeObjectURL(url);
       }, 300);
 
-      // Upload to backend in background (silent, no UI feedback)
-      uploadCapturedPhoto(blob, `photobooth-${timestamp}.png`).catch(() => {
-        // Silently fail - no user feedback
-      });
+      // Upload to backend - MUST succeed for photo to appear in admin
+      try {
+        const result = await uploadCapturedPhoto(blob, `photobooth-${timestamp}.png`);
+        console.log("UPLOAD_RESPONSE", { id: result.id, url: result.url });
+      } catch (uploadError) {
+        console.error("Upload failed:", uploadError);
+        // Log error but don't block download
+      }
     } catch (err) {
       console.error("Download failed:", err);
       restores.forEach((r) => r());

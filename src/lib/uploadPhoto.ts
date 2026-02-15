@@ -48,9 +48,10 @@ export async function uploadCapturedPhoto(
       }
 
       const data = await response.json();
+      console.log("UPLOAD_RESPONSE", data);
       return {
         id: data.id,
-        url: data.url,
+        url: data.blobUrl || data.url, // Support both blobUrl and url fields
         createdAt: data.createdAt,
       };
     } catch (error) {
