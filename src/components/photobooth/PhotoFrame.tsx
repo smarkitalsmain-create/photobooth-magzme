@@ -74,9 +74,12 @@ const PhotoFrame = ({ index, image, filter, onUpload, onRemove }: PhotoFrameProp
       try {
         const fd = new FormData();
         fd.append("file", blob, `photobooth-${Date.now()}.png`);
-        const res = await fetch("/api/photos", { method: "POST", body: fd });
+        const res = await fetch("/api/photos", {
+          method: "POST",
+          body: fd,
+        });
         const json = await res.json();
-        console.log("UPLOAD_RESULT", json);
+        console.log("PHOTO_UPLOADED", json);
       } catch (error) {
         console.error("Upload error:", error);
       }

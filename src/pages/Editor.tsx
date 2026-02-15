@@ -133,20 +133,16 @@ const Editor = () => {
 
       // Upload to backend
       try {
-        const formData = new FormData();
-        formData.append("file", file);
+        const fd = new FormData();
+        fd.append("file", file);
 
-        const response = await fetch("/api/photos", {
+        const res = await fetch("/api/photos", {
           method: "POST",
-          body: formData,
+          body: fd,
         });
 
-        if (response.ok) {
-          const result = await response.json();
-          console.log("UPLOAD_OK", result);
-        } else {
-          console.error("Upload failed:", response.status, response.statusText);
-        }
+        const json = await res.json();
+        console.log("PHOTO_UPLOADED", json);
       } catch (error) {
         console.error("Upload error:", error);
       }
@@ -386,9 +382,12 @@ const Editor = () => {
       try {
         const fd = new FormData();
         fd.append("file", blob, `photobooth-${timestamp}.png`);
-        const res = await fetch("/api/photos", { method: "POST", body: fd });
+        const res = await fetch("/api/photos", {
+          method: "POST",
+          body: fd,
+        });
         const json = await res.json();
-        console.log("UPLOAD_RESULT", json);
+        console.log("PHOTO_UPLOADED", json);
       } catch (uploadError) {
         console.error("Upload failed:", uploadError);
         // Log error but don't block download
