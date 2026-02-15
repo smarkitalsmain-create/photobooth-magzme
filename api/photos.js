@@ -31,6 +31,7 @@ export default async function handler(req, res) {
 
       const photos = await withTimeout(
         prisma.photo.findMany({
+          where: { blobUrl: { not: null } },
           orderBy: { createdAt: "desc" },
           take: limit,
           select: { id: true, blobUrl: true, size: true, createdAt: true },
@@ -38,7 +39,7 @@ export default async function handler(req, res) {
         5000
       );
 
-      // Return all photos with hasUrl flag
+      // Return photos as-is (no extra filtering)
       const items = photos.map((p) => {
         const url = (p.blobUrl ?? "").trim() || null;
         return {
@@ -54,14 +55,61 @@ export default async function handler(req, res) {
       return;
     }
 
-    // POST: Upload photo
+    // POST: Upload photo or seed
     if (req.method === "POST") {
-      // Check if it's multipart/form-data (upload) or JSON (other operations)
+      res.setHeader("Content-Type", "application/json; charset=utf-8");
+
+      // Check if it's JSON seed request
       const contentType = req.headers?.["content-type"] || req.headers?.["Content-Type"] || "";
       const isMultipart = contentType.includes("multipart/form-data");
 
+      // TEMPORARY: Seed endpoint for verification
       if (!isMultipart) {
-        res.setHeader("Content-Type", "application/json; charset=utf-8");
+        try {
+          let body = null;
+          if (req.body) {
+            if (typeof req.body === "string") {
+              body = JSON.parse(req.body);
+            } else if (typeof req.body === "object") {
+              body = req.body;
+            }
+          }
+
+          if (body && body.seed === true) {
+            // Check DATABASE_URL
+            if (!process.env.DATABASE_URL) {
+              res.status(500).end(JSON.stringify({ error: "DATABASE_URL not configured" }));
+              return;
+            }
+
+            // Insert test row with valid image URL
+            const photo = await prisma.photo.create({
+              data: {
+                originalName: "seed-test.jpg",
+                mimeType: "image/jpeg",
+                size: 0,
+                blobUrl: "https://picsum.photos/600",
+                createdAt: new Date(),
+              },
+            });
+
+            console.log("SEED_PHOTO_CREATED", { id: photo.id });
+
+            res.status(201).end(
+              JSON.stringify({
+                ok: true,
+                id: photo.id,
+                blobUrl: photo.blobUrl,
+                message: "Seed photo created",
+              })
+            );
+            return;
+          }
+        } catch (parseError) {
+          // Not JSON seed, continue to upload flow
+        }
+
+        // If not seed and not multipart, return error
         res.status(400).end(JSON.stringify({ error: "Expected multipart/form-data for upload" }));
         return;
       }
