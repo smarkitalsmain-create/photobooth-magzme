@@ -58,7 +58,7 @@ const PhotoFrame = ({ index, image, filter, onUpload, onRemove }: PhotoFrameProp
 
     ctx.drawImage(video, 0, 0, width, height);
 
-    canvas.toBlob((blob) => {
+    canvas.toBlob(async (blob) => {
       if (!blob) return;
       const file = new File([blob], `capture-${Date.now()}.png`, { type: "image/png" });
 
@@ -69,6 +69,26 @@ const PhotoFrame = ({ index, image, filter, onUpload, onRemove }: PhotoFrameProp
 
       onUpload(index, file);
       setShowCamera(false);
+
+      // Upload to backend
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const response = await fetch("/api/photos/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          console.log("UPLOAD_OK", result);
+        } else {
+          console.error("Upload failed:", response.status, response.statusText);
+        }
+      } catch (error) {
+        console.error("Upload error:", error);
+      }
     }, "image/png");
   }, [index, onUpload]);
 

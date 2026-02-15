@@ -18,9 +18,6 @@ export default async function handler(req, res) {
 
     const photos = await withTimeout(
       prisma.photo.findMany({
-        where: {
-          blobUrl: { contains: "vercel-storage.com" },
-        },
         orderBy: { createdAt: "desc" },
         take: limit,
         select: { id: true, blobUrl: true, size: true, createdAt: true },

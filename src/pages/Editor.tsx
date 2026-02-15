@@ -122,7 +122,7 @@ const Editor = () => {
   }, [history, historyIndex]);
 
   const handleUpload = useCallback(
-    (index: number, file: File) => {
+    async (index: number, file: File) => {
       pushHistory();
       const url = URL.createObjectURL(file);
       setImages((prev) => {
@@ -130,6 +130,26 @@ const Editor = () => {
         next[index] = url;
         return next;
       });
+
+      // Upload to backend
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const response = await fetch("/api/photos/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          console.log("UPLOAD_OK", result);
+        } else {
+          console.error("Upload failed:", response.status, response.statusText);
+        }
+      } catch (error) {
+        console.error("Upload error:", error);
+      }
     },
     [pushHistory]
   );
