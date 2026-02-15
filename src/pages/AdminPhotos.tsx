@@ -46,7 +46,7 @@ const AdminPhotos = () => {
       let response;
       try {
         // Fetch absolute API route
-        response = await fetch(`${base}/api/photos/list?limit=50`, {
+        response = await fetch(`${base}/api/photos?limit=50`, {
           signal: controller.signal,
         });
         clearTimeout(timeoutId);
@@ -213,8 +213,8 @@ const AdminPhotos = () => {
       setError(null);
 
       const base = import.meta.env.VITE_API_BASE_URL || "";
-      const response = await fetch(`${base}/api/photos/cleanup`, {
-        method: "POST",
+      const response = await fetch(`${base}/api/photos`, {
+        method: "DELETE",
         credentials: "include",
         headers: {
           "Content-Type": "application/json",

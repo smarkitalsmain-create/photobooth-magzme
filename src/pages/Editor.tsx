@@ -136,7 +136,7 @@ const Editor = () => {
         const formData = new FormData();
         formData.append("file", file);
 
-        const response = await fetch("/api/photos/upload", {
+        const response = await fetch("/api/photos", {
           method: "POST",
           body: formData,
         });

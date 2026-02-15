@@ -35,7 +35,7 @@ export async function uploadCapturedPhoto(
   let lastError: Error | null = null;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const response = await fetch("/api/photos/upload", {
+      const response = await fetch("/api/photos", {
         method: "POST",
         body: formData,
       });

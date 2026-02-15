@@ -75,7 +75,7 @@ const PhotoFrame = ({ index, image, filter, onUpload, onRemove }: PhotoFrameProp
         const formData = new FormData();
         formData.append("file", file);
 
-        const response = await fetch("/api/photos/upload", {
+        const response = await fetch("/api/photos", {
           method: "POST",
           body: formData,
         });
