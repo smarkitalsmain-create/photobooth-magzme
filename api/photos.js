@@ -302,12 +302,18 @@ export default async function handler(req, res) {
           }
 
           if (!fileData || !fileName) {
-            res.status(400).end(JSON.stringify({ error: "No file uploaded" }));
+            res.status(400).end(
+              JSON.stringify({
+                ok: false,
+                error: "NO_FILE",
+              })
+            );
             return;
           }
 
           try {
-            console.log("UPLOAD_START", { fileName, size: fileData.length });
+            console.log("UPLOAD_START");
+            console.log(`UPLOAD_FILE_RECEIVED ${fileName} ${fileData.length}`);
 
             // Check BLOB_READ_WRITE_TOKEN before uploading
             if (!process.env.BLOB_READ_WRITE_TOKEN) {
@@ -338,21 +344,18 @@ export default async function handler(req, res) {
               throw new Error("Invalid blob URL format");
             }
 
-            console.log("BLOB_UPLOADED", { id: "uploaded", blobUrlLength: uploaded.url.length });
+            console.log("BLOB_UPLOADED");
 
             // Save metadata to database (blobUrl is guaranteed to be set)
             const photo = await prisma.photo.create({
               data: {
-                originalName: fileName,
-                mimeType: mimeType || "image/png",
-                size: fileData.length,
                 blobUrl: uploaded.url,
-                storagePath: null,
+                size: fileData.length,
                 createdAt: new Date(),
               },
             });
 
-            console.log("DB_ROW_CREATED", { id: photo.id });
+            console.log(`DB_ROW_CREATED ${photo.id}`);
 
             res.status(201).end(
               JSON.stringify({
