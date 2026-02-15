@@ -13,6 +13,76 @@ interface Photo {
   hasUrl?: boolean;
 }
 
+// Component for photo card with error handling
+const PhotoCard = ({ photo, onDownload, onDelete, formatSize, formatDate }: {
+  photo: Photo;
+  onDownload: (photo: Photo) => void;
+  onDelete: (photo: Photo) => void;
+  formatSize: (bytes: number) => string;
+  formatDate: (dateString: string) => string;
+}) => {
+  const [imageError, setImageError] = useState(false);
+  const photoUrl = photo.blobUrl || "";
+  const hasUrl = photoUrl.trim() !== "";
+  const isValidVercelUrl = photoUrl.includes("vercel-storage.com");
+
+  return (
+    <div className="rounded-xl border border-border bg-card/80 p-4 flex flex-col gap-3">
+      {/* Preview image - show for all photos with URL, even if not Vercel */}
+      {hasUrl ? (
+        <div className="w-full aspect-square rounded-lg overflow-hidden bg-muted flex items-center justify-center">
+          {!imageError ? (
+            <img
+              src={photoUrl}
+              alt={photo.originalName}
+              className="w-full h-full object-cover"
+              onError={() => {
+                setImageError(true);
+              }}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-muted/50">
+              <p className="text-xs text-muted-foreground text-center px-2">
+                Preview unavailable
+              </p>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="w-full aspect-square rounded-lg bg-muted flex items-center justify-center border-2 border-dashed border-muted-foreground/20">
+          <p className="text-xs text-muted-foreground text-center px-2">
+            No preview URL
+          </p>
+        </div>
+      )}
+      <div className="space-y-1">
+        <p className="text-xs font-semibold text-foreground truncate">
+          {photo.originalName}
+        </p>
+        <p className="text-[11px] text-muted-foreground">
+          {formatSize(photo.size)} • {formatDate(photo.createdAt)}
+        </p>
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={() => onDownload(photo)}
+          disabled={!isValidVercelUrl}
+          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-xs font-display hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Download className="w-4 h-4" />
+          Download
+        </button>
+        <button
+          onClick={() => onDelete(photo)}
+          className="flex items-center justify-center gap-2 px-3 py-2 bg-destructive text-destructive-foreground rounded-lg text-xs font-display hover:opacity-90"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const AdminPhotos = () => {
   const navigate = useNavigate();
   const [isAuthed, setIsAuthed] = useState(false);
@@ -26,12 +96,12 @@ const AdminPhotos = () => {
       const stored = window.localStorage.getItem("magzme_admin_authed");
       if (stored === "true") {
         setIsAuthed(true);
-        fetchPhotos();
+        fetchPhotos(50);
       }
     }
   }, []);
 
-  const fetchPhotos = async () => {
+  const fetchPhotos = async (limit: number = 50) => {
     try {
       setLoading(true);
       setError(null);
@@ -45,8 +115,8 @@ const AdminPhotos = () => {
       
       let response;
       try {
-        // Fetch absolute API route (use op=list for explicit operation)
-        response = await fetch(`${base}/api/photos?op=list&limit=50`, {
+        // Fetch absolute API route
+        response = await fetch(`${base}/api/photos?op=list&limit=${limit}`, {
           signal: controller.signal,
         });
         clearTimeout(timeoutId);
@@ -113,44 +183,42 @@ const AdminPhotos = () => {
         return;
       }
       
-      // Expect { items: [...] } format
+      // Strict parsing: expect { items: [...] } format
       if (!data || typeof data !== "object") {
         setError("Invalid response format: expected object");
         setLoading(false);
         return;
       }
       
-      if (!Array.isArray(data.items)) {
-        setError("Invalid response format: expected 'items' array");
-        setLoading(false);
-        return;
+      // Extract items array - do NOT look for data.photos, data.data, etc.
+      const items = Array.isArray(data.items) ? data.items : [];
+      
+      // Debug logging (dev mode only)
+      if (import.meta.env.DEV) {
+        console.log("[photos] fetched", items.length, data);
       }
       
-      // Handle empty array gracefully
-      if (data.items.length === 0) {
-        setPhotos([]);
-        setLoading(false);
-        return;
-      }
-      
-      // Map photos format (API returns: id, blobUrl, size, createdAt, hasUrl, status)
-      const mappedPhotos = data.items.map((item: any) => ({
-        id: item.id,
-        originalName: item.originalName || `Photo ${item.id.slice(0, 8)}`,
-        mimeType: "image/png", // Default since not in response
-        size: item.size ?? 0,
-        createdAt: item.createdAt,
-        blobUrl: item.blobUrl ?? null,
-        url: item.blobUrl ?? null, // Keep for backward compatibility
-        hasUrl: item.hasUrl ?? Boolean(item.blobUrl && item.blobUrl.trim() !== ""),
-        status: item.status || (item.hasUrl ? "ready" : "legacy_missing_url"),
-      }));
+      // Map items to Photo format
+      // Do NOT filter by size, storagePath, or URL type
+      // Only require that blobUrl exists (even if it's not a Vercel URL)
+      const mappedPhotos = items.map((item: any) => {
+        const url = item.blobUrl || "";
+        return {
+          id: item.id,
+          originalName: `Photo ${item.id.slice(0, 8)}`,
+          mimeType: "image/jpeg",
+          size: item.size ?? 0,
+          createdAt: item.createdAt,
+          blobUrl: url,
+          url: url, // Keep for backward compatibility
+          hasUrl: !!url && url.trim() !== "",
+        };
+      });
       
       setPhotos(mappedPhotos);
     } catch (err) {
       console.error("Error fetching photos:", err);
       setError(err instanceof Error ? err.message : "Failed to load photos");
-      setLoading(false);
     } finally {
       setLoading(false);
     }
@@ -196,7 +264,7 @@ const AdminPhotos = () => {
       }
 
       // Refresh the list
-      fetchPhotos();
+      fetchPhotos(50);
     } catch (err) {
       console.error("Error deleting photo:", err);
       alert("Failed to delete photo. You may need to authenticate.");
@@ -230,7 +298,7 @@ const AdminPhotos = () => {
       alert(`Successfully deleted ${result.deletedCount} legacy photo(s).`);
       
       // Refresh the list
-      fetchPhotos();
+      fetchPhotos(50);
     } catch (err) {
       console.error("Error cleaning up legacy photos:", err);
       setError(err instanceof Error ? err.message : "Failed to clean up legacy photos");
@@ -301,7 +369,7 @@ const AdminPhotos = () => {
                 </button>
               )}
               <button
-                onClick={fetchPhotos}
+                onClick={() => fetchPhotos(50)}
                 className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-display hover:opacity-90"
               >
                 Refresh
@@ -327,62 +395,16 @@ const AdminPhotos = () => {
 
           {!loading && !error && photos.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {photos.map((photo) => {
-                const photoUrl = photo.blobUrl;
-                // Only allow Vercel Blob URLs
-                const isValidVercelUrl = photoUrl && photoUrl.includes("vercel-storage.com");
-                
-                return (
-                  <div
-                    key={photo.id}
-                    className="rounded-xl border border-border bg-card/80 p-4 flex flex-col gap-3"
-                  >
-                    {isValidVercelUrl ? (
-                      <div className="w-full aspect-square rounded-lg overflow-hidden bg-muted flex items-center justify-center">
-                        <img
-                          src={photoUrl!}
-                          alt={photo.originalName}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.style.display = "none";
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-full aspect-square rounded-lg bg-muted flex items-center justify-center border-2 border-dashed border-muted-foreground/20">
-                        <p className="text-xs text-muted-foreground text-center px-2">
-                          Invalid or test photo
-                        </p>
-                      </div>
-                    )}
-                    <div className="space-y-1">
-                      <p className="text-xs font-semibold text-foreground truncate">
-                        {photo.originalName}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {formatSize(photo.size)} • {formatDate(photo.createdAt)}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleDownload(photo)}
-                        disabled={!isValidVercelUrl}
-                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-xs font-display hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <Download className="w-4 h-4" />
-                        Download
-                      </button>
-                      <button
-                        onClick={() => handleDelete(photo)}
-                        className="flex items-center justify-center gap-2 px-3 py-2 bg-destructive text-destructive-foreground rounded-lg text-xs font-display hover:opacity-90"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+              {photos.map((photo) => (
+                <PhotoCard
+                  key={photo.id}
+                  photo={photo}
+                  onDownload={handleDownload}
+                  onDelete={handleDelete}
+                  formatSize={formatSize}
+                  formatDate={formatDate}
+                />
+              ))}
             </div>
           )}
         </div>
